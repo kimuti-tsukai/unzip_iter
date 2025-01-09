@@ -3,7 +3,7 @@ name = "unzip_iter"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-authors = ["kimuti_tsukai"]
+authors = ["kimuti_tsukai <ruster354@gmail.com>"]
 description = "Unzip an iterator to iterators"
 
 [dependencies]
