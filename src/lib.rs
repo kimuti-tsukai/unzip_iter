@@ -48,6 +48,7 @@ pub trait Unzip<A, B>: Iterator<Item = (A, B)> + Sized {
     /// # Returns
     /// A tuple of two iterators. The first iterator yields the left elements `(A)` of the tuples,
     /// and the second iterator yields the right elements `(B)` of the tuples.
+    #[allow(clippy::type_complexity)]
     fn unzip_iter(self) -> (UnzipIter<A, B, Self, A>, UnzipIter<A, B, Self, B>);
 
     /// Splits the iterator into two thread-safe iterators.
@@ -78,6 +79,7 @@ pub trait Unzip<A, B>: Iterator<Item = (A, B)> + Sized {
     /// assert_eq!(left_thread.join().unwrap(), vec![1, 2, 3]);
     /// assert_eq!(right_thread.join().unwrap(), vec!["a", "b", "c"]);
     /// ```
+    #[allow(clippy::type_complexity)]
     fn unzip_iter_sync(self) -> (SyncUnzipIter<A, B, Self, A>, SyncUnzipIter<A, B, Self, B>);
 }
 
