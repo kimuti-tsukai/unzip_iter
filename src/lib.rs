@@ -188,6 +188,7 @@ impl<A, B, I: Iterator<Item = (A, B)> + ExactSizeIterator> UnzipInner<A, B, I> {
     }
 }
 
+#[derive(Clone, Debug)]
 struct Selector<A, B, O> {
     pub(crate) sel_mut: for<'a> fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
     pub(crate) sel_ref: for<'a> fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
@@ -234,6 +235,7 @@ mod selector {
 /// assert!(numbers.eq(vec![1, 2, 3].into_iter()));
 /// assert!(letters.eq(vec!["a", "b", "c"].into_iter()));
 /// ```
+#[derive(Clone, Debug)]
 pub struct UnzipIter<A, B, I: Iterator<Item = (A, B)>, O> {
     queue_selector: Selector<A, B, O>,
     inner: Rc<RefCell<UnzipInner<A, B, I>>>,
@@ -294,6 +296,7 @@ impl<A, B, I, O> FusedIterator for UnzipIter<A, B, I, O> where
 /// assert_eq!(left_thread.join().unwrap(), vec![1, 2, 3]);
 /// assert_eq!(right_thread.join().unwrap(), vec!["a", "b", "c"]);
 /// ```
+#[derive(Clone, Debug)]
 pub struct SyncUnzipIter<A, B, I: Iterator<Item = (A, B)>, O> {
     queue_selector: Selector<A, B, O>,
     inner: Arc<Mutex<UnzipInner<A, B, I>>>,
