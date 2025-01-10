@@ -1,6 +1,6 @@
 [package]
 name = "unzip_iter"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 authors = ["kimuti_tsukai <ruster354@gmail.com>"]
