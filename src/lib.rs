@@ -386,4 +386,26 @@ mod tests {
         assert_eq!(left_thread.join().unwrap(), vec![1, 3, 5]);
         assert_eq!(right_thread.join().unwrap(), vec![2, 3, 4]);
     }
+
+    #[test]
+    fn test_len() {
+        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+
+        let (left, mut right) = it.unzip_iter();
+
+        right.next();
+
+        assert_eq!(left.len(), 3);
+        assert_eq!(right.len(), 2);
+
+        right.next();
+        right.next();
+
+        assert_eq!(left.len(), 3);
+        assert_eq!(right.len(), 0);
+
+        right.next();
+
+        assert_eq!(right.len(), 0);
+    }
 }
