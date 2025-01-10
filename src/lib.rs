@@ -278,9 +278,7 @@ where
     I: Iterator<Item = (A, B)> + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("UnzipIter")
-            .field("iter", &*self.inner.borrow())
-            .finish()
+        write!(f, "SyncUnzipIter {{ ... }}")
     }
 }
 
@@ -356,9 +354,7 @@ where
     I: Iterator<Item = (A, B)> + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("UnzipIter")
-            .field("iter", &*self.inner.lock().expect("Failed to lock mutex"))
-            .finish()
+        write!(f, "SyncUnzipIter {{ ... }}")
     }
 }
 
