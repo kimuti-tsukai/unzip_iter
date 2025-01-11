@@ -1,7 +1,7 @@
 //! Unzip iterators
-//! This module provides a trait `Unzip` that allows splitting an iterator over tuples into two separate iterators.
+//! This module provides a trait [`Unzip`] that allows splitting an iterator over tuples into two separate iterators.
 //!
-//! The `Unzip` trait simplifies the process of working with iterators of tuples by providing a method `unzip_iter`. This method produces two independent iterators, each iterating over one side of the tuple. This can be especially useful when you need to process or collect the components of the tuples separately.
+//! The [`Unzip`] trait simplifies the process of working with iterators of tuples by providing a method [`unzip_iter`](crate::Unzip::unzip_iter). This method produces two independent iterators, each iterating over one side of the tuple. This can be especially useful when you need to process or collect the components of the tuples separately.
 //!
 //! # Example
 //! ```
@@ -14,7 +14,7 @@
 //! assert!(right.eq(vec![2, 3, 4].into_iter()));
 //! ```
 //!
-//! The module also provides `SyncUnzipIter` for thread-safe usage via `Arc` and `Mutex`.
+//! The module also provides [`SyncUnzipIter`] for thread-safe usage via [`Arc`] and [`Mutex`].
 
 use std::{
     cell::RefCell,
@@ -27,7 +27,7 @@ use std::{
 
 /// A trait to split an iterator over tuples into two separate iterators.
 ///
-/// The `Unzip` trait extends any iterator over tuples `(A, B)` by providing the `unzip_iter` method.
+/// The [`Unzip`] trait extends any iterator over tuples `(A, B)` by providing the [`unzip_iter`](crate::Unzip::unzip_iter) method.
 /// This method enables splitting the original iterator into two independent iterators: one for the left elements
 /// and another for the right elements.
 ///
@@ -54,7 +54,7 @@ pub trait Unzip<A, B>: Iterator<Item = (A, B)> + Sized {
 
     /// Splits the iterator into two thread-safe iterators.
     ///
-    /// The `unzip_iter_sync` method allows you to create two separate thread-safe iterators
+    /// The [`unzip_iter_sync`](crate::Unzip::unzip_iter_sync) method allows you to create two separate thread-safe iterators
     /// from an iterator over tuples `(A, B)`. These iterators can be used in multi-threaded
     /// environments where concurrent access to the original data is required.
     ///
@@ -225,7 +225,7 @@ mod selector {
 
 /// An iterator that yields one side of a tuple from the original iterator.
 ///
-/// `UnzipIter` is produced by the `unzip_iter` method of the `Unzip` trait. It is responsible for iterating over
+/// [`UnzipIter`] is produced by the [`unzip_iter`](crate::Unzip::unzip_iter) method of the [`Unzip`] trait. It is responsible for iterating over
 /// either the left or the right elements of the tuples from the original iterator.
 ///
 /// # Example
@@ -284,10 +284,10 @@ where
 
 /// A thread-safe iterator that yields one side of a tuple from the original iterator.
 ///
-/// `SyncUnzipIter` is created by the `unzip_iter_sync` method of the `Unzip` trait.
+/// [`SyncUnzipIter`] is created by the [`unzip_iter_sync`](crate::Unzip::unzip_iter_sync) method of the [Unzip] trait.
 /// It allows you to process either the left or the right elements of the tuples
 /// from the original iterator in a thread-safe manner. This is achieved by wrapping
-/// the shared internal state with `Arc` and `Mutex`.
+/// the shared internal state with [`Arc`] and [`Mutex`].
 ///
 /// # Thread-Safety
 /// The thread-safe design enables multiple threads to access and process the
