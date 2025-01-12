@@ -503,4 +503,29 @@ mod tests {
 
         assert_eq!(right.len(), 0);
     }
+
+    #[test]
+    fn test_thread_panic() {
+        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+
+        let (left, mut right) = it.unzip_iter_sync();
+
+        std::thread::spawn(move || {
+            let mut moved = left;
+
+            assert_eq!(moved.next(), Some(1));
+            assert_eq!(moved.next(), Some(3));
+            assert_eq!(moved.next(), Some(5));
+            assert_eq!(moved.next(), None);
+
+            panic!("Thread panic!");
+        })
+        .join()
+        .unwrap_err();
+
+        assert_eq!(right.next(), Some(2));
+        assert_eq!(right.next(), Some(3));
+        assert_eq!(right.next(), Some(4));
+        assert_eq!(right.next(), None);
+    }
 }
