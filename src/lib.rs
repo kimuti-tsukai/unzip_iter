@@ -397,7 +397,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.inner
             .lock()
-            .expect("Failed to Lock")
+            .expect("Failed to Lock. Iterator paniced.")
             .next_either(self.queue_selector.sel_mut)
     }
 }
@@ -409,7 +409,7 @@ where
     fn len(&self) -> usize {
         self.inner
             .lock()
-            .expect("Failed to Lock")
+            .expect("Failed to Lock. Iterator paniced.")
             .len_either(self.queue_selector.sel_ref)
     }
 }
@@ -530,7 +530,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Failed to Lock")]
+    #[should_panic(expected = "Failed to Lock. Iterator paniced.")]
     fn panic_iter() {
         let it = (0..).map(|v| {
             assert!(v < 1);
