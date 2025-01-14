@@ -528,4 +528,25 @@ mod tests {
         assert_eq!(right.next(), Some(4));
         assert_eq!(right.next(), None);
     }
+
+    #[test]
+    #[should_panic(expected = "Failed to Lock")]
+    fn panic_iter() {
+        let it = (0..).map(|v| {
+            assert!(v < 1);
+            ((), ())
+        });
+
+        let (left, mut right) = it.unzip_iter_sync();
+
+        let thread = std::thread::spawn(move || {
+            let mut left = left;
+
+            left.nth(1);
+        });
+
+        let _ = thread.join();
+
+        right.next();
+    }
 }
