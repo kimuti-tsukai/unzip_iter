@@ -491,6 +491,18 @@ where
     }
 }
 
+impl<A, B, I, O> DoubleEndedIterator for SyncUnzipIter<A, B, I, O>
+where
+    I: DoubleEndedIterator<Item = (A, B)>,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.inner
+            .lock()
+            .expect("Failed to Lock. Iterator paniced.")
+            .next_back_either(self.queue_selector.sel_mut)
+    }
+}
+
 impl<A, B, I, O> ExactSizeIterator for SyncUnzipIter<A, B, I, O>
 where
     I: Iterator<Item = (A, B)> + ExactSizeIterator,
