@@ -1,6 +1,6 @@
 [package]
 name = "unzip_iter"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 repository = "https://github.com/kimuti-tsukai/unzip_iter"
 license = "MIT"
