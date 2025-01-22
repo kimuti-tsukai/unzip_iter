@@ -43,14 +43,24 @@ use std::{
 /// ```
 ///
 /// This can be particularly useful when working with collections of key-value pairs or coordinate data.
-pub trait Unzip<A, B>: Iterator<Item = (A, B)> + Sized {
+pub trait Unzip: Iterator<Item = (Self::Left, Self::Right)> + Sized {
+    /// The type of the left elements in the tuple
+    type Left;
+    /// The type of the right elements in the tuple
+    type Right;
+
     /// Splits the iterator into two separate iterators.
     ///
     /// # Returns
     /// A tuple of two iterators. The first iterator yields the left elements `(A)` of the tuples,
     /// and the second iterator yields the right elements `(B)` of the tuples.
     #[allow(clippy::type_complexity)]
-    fn unzip_iter(self) -> (UnzipIter<A, B, Self, A>, UnzipIter<A, B, Self, B>);
+    fn unzip_iter(
+        self,
+    ) -> (
+        UnzipIter<Self::Left, Self::Right, Self, Self::Left>,
+        UnzipIter<Self::Left, Self::Right, Self, Self::Right>,
+    );
 
     /// Splits the iterator into two thread-safe iterators.
     ///
@@ -81,11 +91,27 @@ pub trait Unzip<A, B>: Iterator<Item = (A, B)> + Sized {
     /// assert_eq!(right_thread.join().unwrap(), vec!["a", "b", "c"]);
     /// ```
     #[allow(clippy::type_complexity)]
-    fn unzip_iter_sync(self) -> (SyncUnzipIter<A, B, Self, A>, SyncUnzipIter<A, B, Self, B>);
+    fn unzip_iter_sync(
+        self,
+    ) -> (
+        SyncUnzipIter<Self::Left, Self::Right, Self, Self::Left>,
+        SyncUnzipIter<Self::Left, Self::Right, Self, Self::Right>,
+    );
 }
 
-impl<A, B, I: Iterator<Item = (A, B)>> Unzip<A, B> for I {
-    fn unzip_iter(self) -> (UnzipIter<A, B, Self, A>, UnzipIter<A, B, Self, B>) {
+impl<I, A, B> Unzip for I
+where
+    I: Iterator<Item = (A, B)>,
+{
+    type Left = A;
+    type Right = B;
+
+    fn unzip_iter(
+        self,
+    ) -> (
+        UnzipIter<Self::Left, Self::Right, Self, Self::Left>,
+        UnzipIter<Self::Left, Self::Right, Self, Self::Right>,
+    ) {
         let rc = Rc::new(RefCell::new(UnzipInner::new(self)));
 
         (
@@ -106,7 +132,12 @@ impl<A, B, I: Iterator<Item = (A, B)>> Unzip<A, B> for I {
         )
     }
 
-    fn unzip_iter_sync(self) -> (SyncUnzipIter<A, B, Self, A>, SyncUnzipIter<A, B, Self, B>) {
+    fn unzip_iter_sync(
+        self,
+    ) -> (
+        SyncUnzipIter<Self::Left, Self::Right, Self, Self::Left>,
+        SyncUnzipIter<Self::Left, Self::Right, Self, Self::Right>,
+    ) {
         let rc = Arc::new(Mutex::new(UnzipInner::new(self)));
 
         (
@@ -172,7 +203,7 @@ impl<A> Buffer<A> {
 /// [   ] iter.left  [ o ] // Store value
 /// [ o ] iter.right [   ] // Consume value
 /// ```
-/// 
+///
 /// Test: [`how_unzip_inner_works`](crate::tests::unzip_inner_tests::how_unzip_inner_works)
 #[derive(Clone, Debug)]
 struct UnzipInner<A, B, I: Iterator<Item = (A, B)>> {
