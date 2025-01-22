@@ -128,78 +128,6 @@ impl<A, B, I: Iterator<Item = (A, B)>> Unzip<A, B> for I {
     }
 }
 
-/// A struct that converts an iterator of references to tuples `&(A, B)`
-/// into an iterator of references to the individual elements `(&A, &B)`.
-///
-/// This struct is primarily created using the [`IntoRefPairs::ref_pairs`] method.
-pub struct RefPairs<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> {
-    iter: I,
-}
-
-impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> Iterator for RefPairs<'a, A, B, I> {
-    type Item = (&'a A, &'a B);
-
-    /// Advances the iterator and returns the next pair of references to the tuple's elements.
-    ///
-    /// # Returns
-    ///
-    /// - `Some((&A, &B))` if there is another tuple in the iterator.
-    /// - `None` if the iterator is exhausted.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use unzip_iter::IntoRefPairs;
-    /// let pairs = vec![(1, 2), (3, 4)];
-    /// let mut iter = pairs.iter().ref_pairs();
-    ///
-    /// assert_eq!(iter.next(), Some((&1, &2)));
-    /// assert_eq!(iter.next(), Some((&3, &4)));
-    /// assert_eq!(iter.next(), None);
-    /// ```
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|(a, b)| (a, b))
-    }
-}
-
-/// A trait that provides a method to convert an iterator of references to tuples `&(A, B)`
-/// into an iterator of references to the individual elements `(&A, &B)`.
-/// It is same as `.map(|(a, b)| (a, b))`.
-/// You can use with [`Unzip`] as below.
-/// ```
-/// use unzip_iter::{Unzip, IntoRefPairs};
-///
-/// let it = [(1, 2), (3, 3), (5, 4)].iter().ref_pairs();
-///
-/// let (left, right) = it.unzip_iter();
-///
-/// assert!(left.eq([1, 3, 5].iter()));
-/// assert!(right.eq([2, 3, 4].iter()));
-/// ```
-pub trait IntoRefPairs<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> {
-    /// Converts the iterator into a [`RefPairs`] iterator.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use unzip_iter::IntoRefPairs;
-    /// let pairs = vec![(1, 2), (3, 4)];
-    /// let ref_pairs = pairs.iter().ref_pairs();
-    ///
-    /// for (a, b) in ref_pairs {
-    ///     println!("a: {}, b: {}", a, b);
-    /// }
-    /// ```
-    fn ref_pairs(self) -> RefPairs<'a, A, B, I>;
-}
-
-impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> IntoRefPairs<'a, A, B, I> for I {
-    /// See [`IntoRefPairs::ref_pairs`].
-    fn ref_pairs(self) -> RefPairs<'a, A, B, I> {
-        RefPairs { iter: self }
-    }
-}
-
 #[derive(Clone, Debug)]
 struct Buffer<A> {
     front: VecDeque<A>,
@@ -244,6 +172,8 @@ impl<A> Buffer<A> {
 /// [   ] iter.left  [ o ] // Store value
 /// [ o ] iter.right [   ] // Consume value
 /// ```
+/// 
+/// Test: [`how_unzip_inner_works`](crate::tests::unzip_inner_tests::how_unzip_inner_works)
 #[derive(Clone, Debug)]
 struct UnzipInner<A, B, I: Iterator<Item = (A, B)>> {
     iter: I,
@@ -260,6 +190,7 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
         }
     }
 
+    /// Push value to front buffer.
     fn next(&mut self) -> Option<()> {
         let (a, b) = self.iter.next()?;
 
@@ -269,25 +200,29 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
         Some(())
     }
 
+    /// Get next value
     fn next_either<F, O>(&mut self, f: F) -> Option<O>
     where
         for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
     {
         let q = self.select_front_queue_mut(&f);
 
-        q.pop_front()
+        q.pop_front() // Get value from front buffer
             .or_else(|| {
-                self.next();
+                // If empty
+                self.next()?; // Push value to front buffer
 
                 let q = self.select_front_queue_mut(&f);
-                q.pop_front()
+                q.pop_front() // Get value from front buffer
             })
             .or_else(|| {
+                // If Iterator is empty
                 let q = self.select_back_queue_mut(&f);
-                q.pop_front()
+                q.pop_front() // Get value from back buffer
             })
     }
 
+    /// Select front buffer
     fn select_front_queue_mut<F, O>(&mut self, selector: F) -> &mut VecDeque<O>
     where
         for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
@@ -295,6 +230,7 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
         selector(&mut self.left.front, &mut self.right.front)
     }
 
+    /// Select front buffer
     fn select_front_queue<F, O>(&self, selector: F) -> &VecDeque<O>
     where
         for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
@@ -302,6 +238,7 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
         selector(&self.left.front, &self.right.front)
     }
 
+    /// Select back buffer
     fn select_back_queue_mut<F, O>(&mut self, selector: F) -> &mut VecDeque<O>
     where
         for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
@@ -309,6 +246,7 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
         selector(&mut self.left.back, &mut self.right.back)
     }
 
+    /// Select back buffer
     fn select_back_queue<F, O>(&self, selector: F) -> &VecDeque<O>
     where
         for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
@@ -543,6 +481,78 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "SyncUnzipIter {{ ... }}")
+    }
+}
+
+/// A struct that converts an iterator of references to tuples `&(A, B)`
+/// into an iterator of references to the individual elements `(&A, &B)`.
+///
+/// This struct is primarily created using the [`IntoRefPairs::ref_pairs`] method.
+pub struct RefPairs<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> {
+    iter: I,
+}
+
+impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> Iterator for RefPairs<'a, A, B, I> {
+    type Item = (&'a A, &'a B);
+
+    /// Advances the iterator and returns the next pair of references to the tuple's elements.
+    ///
+    /// # Returns
+    ///
+    /// - `Some((&A, &B))` if there is another tuple in the iterator.
+    /// - `None` if the iterator is exhausted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use unzip_iter::IntoRefPairs;
+    /// let pairs = vec![(1, 2), (3, 4)];
+    /// let mut iter = pairs.iter().ref_pairs();
+    ///
+    /// assert_eq!(iter.next(), Some((&1, &2)));
+    /// assert_eq!(iter.next(), Some((&3, &4)));
+    /// assert_eq!(iter.next(), None);
+    /// ```
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(a, b)| (a, b))
+    }
+}
+
+/// A trait that provides a method to convert an iterator of references to tuples `&(A, B)`
+/// into an iterator of references to the individual elements `(&A, &B)`.
+/// It is same as `.map(|(a, b)| (a, b))`.
+/// You can use with [`Unzip`] as below.
+/// ```
+/// use unzip_iter::{Unzip, IntoRefPairs};
+///
+/// let it = [(1, 2), (3, 3), (5, 4)].iter().ref_pairs();
+///
+/// let (left, right) = it.unzip_iter();
+///
+/// assert!(left.eq([1, 3, 5].iter()));
+/// assert!(right.eq([2, 3, 4].iter()));
+/// ```
+pub trait IntoRefPairs<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> {
+    /// Converts the iterator into a [`RefPairs`] iterator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use unzip_iter::IntoRefPairs;
+    /// let pairs = vec![(1, 2), (3, 4)];
+    /// let ref_pairs = pairs.iter().ref_pairs();
+    ///
+    /// for (a, b) in ref_pairs {
+    ///     println!("a: {}, b: {}", a, b);
+    /// }
+    /// ```
+    fn ref_pairs(self) -> RefPairs<'a, A, B, I>;
+}
+
+impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> IntoRefPairs<'a, A, B, I> for I {
+    /// See [`IntoRefPairs::ref_pairs`].
+    fn ref_pairs(self) -> RefPairs<'a, A, B, I> {
+        RefPairs { iter: self }
     }
 }
 
@@ -819,6 +829,30 @@ mod tests {
 
     mod unzip_inner_tests {
         use super::*;
+
+        /// Documentation test of [`UnzipInner`]
+        #[test]
+        fn how_unzip_inner_works() {
+            let it = std::iter::repeat((0, 0));
+
+            let left = selector::left_mut;
+            let right = selector::right_mut;
+
+            let mut iter = UnzipInner::new(it);
+
+            iter.next_either(left);
+            assert_eq!(iter.right.front, VecDeque::from([0]));
+
+            iter.next_either(left);
+            assert_eq!(iter.right.front, VecDeque::from([0, 0]));
+
+            iter.next_either(right);
+            assert_eq!(iter.right.front, VecDeque::from([0]));
+
+            iter.next_back_either(right);
+            assert_eq!(iter.left.back, VecDeque::from([0]));
+            assert_eq!(iter.right.front, VecDeque::from([0]));
+        }
 
         #[test]
         fn test_unzip_inner_basic() {
