@@ -550,162 +550,383 @@ where
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_unzip_iter_basic() {
-        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
-        let (left, right) = it.unzip_iter();
+    mod unzip_iter_tests {
+        use super::*;
 
-        assert!(left.eq(vec![1, 3, 5].into_iter()));
-        assert!(right.eq(vec![2, 3, 4].into_iter()));
-    }
+        #[test]
+        fn test_basic() {
+            // 基本的なケース
+            let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
+            let (left, right) = it.unzip_iter();
+            assert!(left.eq(vec![1, 2, 3].into_iter()));
+            assert!(right.eq(vec!["a", "b", "c"].into_iter()));
 
-    #[test]
-    fn test_unzip_iter_empty() {
-        let it = vec![].into_iter();
-        let (left, right): (UnzipIter<_, _, _, i32>, UnzipIter<_, _, _, i32>) = it.unzip_iter();
+            // 異なる型のペア
+            let it = vec![(true, 1.0), (false, 2.0), (true, 3.0)].into_iter();
+            let (bools, nums) = it.unzip_iter();
+            assert!(bools.eq(vec![true, false, true].into_iter()));
+            assert!(nums.eq(vec![1.0, 2.0, 3.0].into_iter()));
 
-        assert!(left.eq(vec![].into_iter()));
-        assert!(right.eq(vec![].into_iter()));
-    }
-
-    #[test]
-    fn test_sync_unzip_iter() {
-        use std::thread;
-
-        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
-        let inner = Arc::new(Mutex::new(UnzipInner::new(it)));
-
-        let left_iter = SyncUnzipIter {
-            queue_selector: Selector {
-                sel_mut: selector::left_mut,
-                sel_ref: selector::left,
-            },
-            inner: Arc::clone(&inner),
-        };
-
-        let right_iter = SyncUnzipIter {
-            queue_selector: Selector {
-                sel_mut: selector::right_mut,
-                sel_ref: selector::right,
-            },
-            inner,
-        };
-
-        let left_thread = thread::spawn(move || left_iter.collect::<Vec<_>>());
-        let right_thread = thread::spawn(move || right_iter.collect::<Vec<_>>());
-
-        assert_eq!(left_thread.join().unwrap(), vec![1, 3, 5]);
-        assert_eq!(right_thread.join().unwrap(), vec![2, 3, 4]);
-    }
-
-    #[test]
-    fn test_len() {
-        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
-
-        let (left, mut right) = it.unzip_iter();
-
-        right.next();
-
-        assert_eq!(left.len(), 3);
-        assert_eq!(right.len(), 2);
-
-        right.next();
-        right.next();
-
-        assert_eq!(left.len(), 3);
-        assert_eq!(right.len(), 0);
-
-        right.next();
-
-        assert_eq!(right.len(), 0);
-    }
-
-    #[test]
-    fn test_thread_panic() {
-        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
-
-        let (left, mut right) = it.unzip_iter_sync();
-
-        std::thread::spawn(move || {
-            let mut moved = left;
-
-            assert_eq!(moved.next(), Some(1));
-            assert_eq!(moved.next(), Some(3));
-            assert_eq!(moved.next(), Some(5));
-            assert_eq!(moved.next(), None);
-
-            panic!("Thread panic!");
-        })
-        .join()
-        .unwrap_err();
-
-        assert_eq!(right.next(), Some(2));
-        assert_eq!(right.next(), Some(3));
-        assert_eq!(right.next(), Some(4));
-        assert_eq!(right.next(), None);
-    }
-
-    #[test]
-    #[should_panic(expected = "Failed to Lock. Iterator paniced.")]
-    fn panic_iter() {
-        let it = (0..).map(|v| {
-            assert!(v < 1);
-            ((), ())
-        });
-
-        let (left, mut right) = it.unzip_iter_sync();
-
-        let thread = std::thread::spawn(move || {
-            let mut left = left;
-
-            left.nth(1);
-        });
-
-        let _ = thread.join();
-
-        right.next();
-    }
-
-    #[test]
-    fn next_back_iter() {
-        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
-        let (_left, mut right) = it.unzip_iter();
-
-        assert_eq!(right.next_back(), Some(4));
-        assert_eq!(right.next_back(), Some(3));
-        assert_eq!(right.next_back(), Some(2));
-        assert_eq!(right.next_back(), None);
-    }
-
-    #[test]
-    fn next_mixture() {
-        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
-        let (mut left, mut right) = it.unzip_iter();
-
-        assert_eq!(left.next(), Some(1));
-        assert_eq!(right.next_back(), Some(4));
-
-        assert_eq!(left.next(), Some(3));
-        assert_eq!(right.next(), Some(2));
-
-        assert_eq!(left.next_back(), Some(5));
-        assert_eq!(right.next_back(), Some(3));
-
-        assert_eq!(left.next_back(), None);
-        assert_eq!(right.next(), None);
-    }
-
-    #[test]
-    fn rev_loop() {
-        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
-        let (left, right) = it.unzip_iter();
-
-        let mut v = Vec::new();
-
-        for (l, r) in left.zip(right.rev()) {
-            v.push((l, r));
+            // 重複値を含むケース
+            let it = vec![(1, 1), (1, 1), (2, 2)].into_iter();
+            let (left, right) = it.unzip_iter();
+            assert!(left.eq(vec![1, 1, 2].into_iter()));
+            assert!(right.eq(vec![1, 1, 2].into_iter()));
         }
 
-        assert_eq!(v, vec![(1, 4), (3, 3), (5, 2)]);
+        #[test]
+        fn test_empty() {
+            let it = vec![].into_iter();
+            let (left, right): (UnzipIter<_, _, _, i32>, UnzipIter<_, _, _, i32>) = it.unzip_iter();
+
+            assert!(left.eq(vec![].into_iter()));
+            assert!(right.eq(vec![].into_iter()));
+        }
+
+        #[test]
+        fn test_len() {
+            let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+            let (left, mut right) = it.unzip_iter();
+
+            right.next();
+            assert_eq!(left.len(), 3);
+            assert_eq!(right.len(), 2);
+
+            right.next();
+            right.next();
+            assert_eq!(left.len(), 3);
+            assert_eq!(right.len(), 0);
+
+            right.next();
+            assert_eq!(right.len(), 0);
+        }
+
+        #[test]
+        fn test_next_back() {
+            let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+            let (_left, mut right) = it.unzip_iter();
+
+            assert_eq!(right.next_back(), Some(4));
+            assert_eq!(right.next_back(), Some(3));
+            assert_eq!(right.next_back(), Some(2));
+            assert_eq!(right.next_back(), None);
+        }
+
+        #[test]
+        fn test_next_mixture() {
+            let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+            let (mut left, mut right) = it.unzip_iter();
+
+            assert_eq!(left.next(), Some(1));
+            assert_eq!(right.next_back(), Some(4));
+            assert_eq!(left.next(), Some(3));
+            assert_eq!(right.next(), Some(2));
+            assert_eq!(left.next_back(), Some(5));
+            assert_eq!(right.next_back(), Some(3));
+            assert_eq!(left.next_back(), None);
+            assert_eq!(right.next(), None);
+        }
+
+        #[test]
+        fn test_rev_loop() {
+            let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+            let (left, right) = it.unzip_iter();
+
+            let mut v = Vec::new();
+            for (l, r) in left.zip(right.rev()) {
+                v.push((l, r));
+            }
+
+            assert_eq!(v, vec![(1, 4), (3, 3), (5, 2)]);
+        }
+    }
+
+    mod sync_unzip_iter_tests {
+        use super::*;
+        use std::thread;
+
+        #[test]
+        fn test_basic() {
+            let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+            let inner = Arc::new(Mutex::new(UnzipInner::new(it)));
+
+            let left_iter = SyncUnzipIter {
+                queue_selector: Selector {
+                    sel_mut: selector::left_mut,
+                    sel_ref: selector::left,
+                },
+                inner: Arc::clone(&inner),
+            };
+
+            let right_iter = SyncUnzipIter {
+                queue_selector: Selector {
+                    sel_mut: selector::right_mut,
+                    sel_ref: selector::right,
+                },
+                inner,
+            };
+
+            let left_thread = thread::spawn(move || left_iter.collect::<Vec<_>>());
+            let right_thread = thread::spawn(move || right_iter.collect::<Vec<_>>());
+
+            assert_eq!(left_thread.join().unwrap(), vec![1, 3, 5]);
+            assert_eq!(right_thread.join().unwrap(), vec![2, 3, 4]);
+        }
+
+        #[test]
+        fn test_complex() {
+            let it = vec![
+                (String::from("hello"), 1),
+                (String::from("world"), 2),
+                (String::from("rust"), 3),
+            ]
+            .into_iter();
+
+            let (left, right) = it.unzip_iter_sync();
+
+            let left_thread =
+                thread::spawn(move || left.map(|s| s.to_uppercase()).collect::<Vec<_>>());
+            let right_thread = thread::spawn(move || right.map(|n| n * 2).collect::<Vec<_>>());
+
+            assert_eq!(left_thread.join().unwrap(), vec!["HELLO", "WORLD", "RUST"]);
+            assert_eq!(right_thread.join().unwrap(), vec![2, 4, 6]);
+        }
+
+        #[test]
+        fn test_thread_panic() {
+            let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+            let (left, mut right) = it.unzip_iter_sync();
+
+            thread::spawn(move || {
+                let mut moved = left;
+                assert_eq!(moved.next(), Some(1));
+                assert_eq!(moved.next(), Some(3));
+                assert_eq!(moved.next(), Some(5));
+                assert_eq!(moved.next(), None);
+                panic!("Thread panic!");
+            })
+            .join()
+            .unwrap_err();
+
+            assert_eq!(right.next(), Some(2));
+            assert_eq!(right.next(), Some(3));
+            assert_eq!(right.next(), Some(4));
+            assert_eq!(right.next(), None);
+        }
+
+        #[test]
+        #[should_panic(expected = "Failed to Lock. Iterator paniced.")]
+        fn test_panic_iter() {
+            let it = (0..).map(|v| {
+                assert!(v < 1);
+                ((), ())
+            });
+
+            let (left, mut right) = it.unzip_iter_sync();
+            let thread = thread::spawn(move || {
+                let mut left = left;
+                left.nth(1);
+            });
+            let _ = thread.join();
+            right.next();
+        }
+
+        #[test]
+        fn test_double_ended_iterator() {
+            let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
+            let (mut left, mut right) = it.unzip_iter_sync();
+
+            assert_eq!(left.next(), Some(1));
+            assert_eq!(right.next_back(), Some("c"));
+            assert_eq!(left.next_back(), Some(3));
+            assert_eq!(right.next(), Some("a"));
+            assert_eq!(left.next(), Some(2));
+            assert_eq!(right.next(), Some("b"));
+            assert_eq!(left.next(), None);
+            assert_eq!(right.next_back(), None);
+        }
+
+        #[test]
+        fn test_concurrent_double_ended() {
+            let it = (0..100).map(|i| (i, i.to_string())).collect::<Vec<_>>();
+            let (left, right) = it.into_iter().unzip_iter_sync();
+
+            let left_thread = thread::spawn(move || {
+                let mut nums = Vec::new();
+                let mut left = left;
+
+                for _ in 0..25 {
+                    if let Some(n) = left.next() {
+                        nums.push(n);
+                    }
+                }
+
+                for _ in 0..25 {
+                    if let Some(n) = left.next_back() {
+                        nums.push(n);
+                    }
+                }
+                nums
+            });
+
+            let right_thread = thread::spawn(move || {
+                let mut strs = Vec::new();
+                let mut right = right;
+
+                for _ in 0..25 {
+                    if let Some(s) = right.next() {
+                        strs.push(s);
+                    }
+                    if let Some(s) = right.next_back() {
+                        strs.push(s);
+                    }
+                }
+                strs
+            });
+
+            let left_result = left_thread.join().unwrap();
+            let right_result = right_thread.join().unwrap();
+
+            assert!(left_result[..25].iter().copied().eq(0..25));
+            assert!(left_result[25..].iter().copied().eq((75..100).rev()));
+
+            let right_nums: Vec<i32> = right_result.iter().map(|s| s.parse().unwrap()).collect();
+            for &n in &right_nums {
+                assert!((0..100).contains(&n));
+            }
+            assert_eq!(right_nums.len(), 50);
+        }
+
+        #[test]
+        fn test_exact_size_iterator() {
+            let it = vec![(1, 'a'), (2, 'b'), (3, 'c')].into_iter();
+            let (mut left, mut right) = it.unzip_iter_sync();
+
+            assert_eq!(left.len(), 3);
+            assert_eq!(right.len(), 3);
+
+            left.next();
+            right.next_back();
+            assert_eq!(left.len(), 2);
+            assert_eq!(right.len(), 2);
+
+            left.next();
+            right.next();
+            assert_eq!(left.len(), 1);
+            assert_eq!(right.len(), 1);
+        }
+    }
+
+    mod unzip_inner_tests {
+        use super::*;
+
+        #[test]
+        fn test_unzip_inner_basic() {
+            let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
+            let mut inner = UnzipInner::new(it);
+
+            // next()で要素を取得
+            assert!(inner.next().is_some());
+            assert_eq!(inner.left.front.pop_front(), Some(1));
+            assert_eq!(inner.right.front.pop_front(), Some("a"));
+
+            // 両方のバッファが空になっていることを確認
+            assert!(inner.left.front.is_empty());
+            assert!(inner.right.front.is_empty());
+        }
+
+        #[test]
+        fn test_unzip_inner_next_either() {
+            let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
+            let mut inner = UnzipInner::new(it);
+
+            // 左側の要素を取得
+            assert_eq!(inner.next_either(selector::left_mut), Some(1));
+            // 右側のバッファには要素が残っているはず
+            assert_eq!(inner.right.front.pop_front(), Some("a"));
+
+            // 右側の要素を取得
+            assert_eq!(inner.next_either(selector::right_mut), Some("b"));
+            // 左側のバッファには要素が残っているはず
+            assert_eq!(inner.left.front.pop_front(), Some(2));
+        }
+
+        #[test]
+        fn test_unzip_inner_double_ended() {
+            let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
+            let mut inner = UnzipInner::new(it);
+
+            // 後ろから要素を取得
+            assert!(inner.next_back().is_some());
+            assert_eq!(inner.left.back.pop_front(), Some(3));
+            assert_eq!(inner.right.back.pop_front(), Some("c"));
+
+            // 前から要素を取得
+            assert!(inner.next().is_some());
+            assert_eq!(inner.left.front.pop_front(), Some(1));
+            assert_eq!(inner.right.front.pop_front(), Some("a"));
+
+            // 残りの要素を確認
+            assert!(inner.next().is_some());
+            assert_eq!(inner.left.front.pop_front(), Some(2));
+            assert_eq!(inner.right.front.pop_front(), Some("b"));
+        }
+
+        #[test]
+        fn test_unzip_inner_buffer_management() {
+            let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
+            let mut inner = UnzipInner::new(it);
+
+            // 前方バッファに要素を追加
+            inner.next();
+            inner.next();
+            assert_eq!(inner.left.front.len(), 2);
+            assert_eq!(inner.right.front.len(), 2);
+
+            // 後方バッファに要素を追加
+            inner.next_back();
+            assert_eq!(inner.left.back.len(), 1);
+            assert_eq!(inner.right.back.len(), 1);
+
+            // バッファから要素を取得
+            assert_eq!(inner.next_either(selector::left_mut), Some(1));
+            assert_eq!(inner.next_either(selector::right_mut), Some("a"));
+            assert_eq!(inner.next_back_either(selector::left_mut), Some(3));
+            assert_eq!(inner.next_back_either(selector::right_mut), Some("c"));
+        }
+
+        #[test]
+        fn test_unzip_inner_empty() {
+            let it = Vec::<(i32, &str)>::new().into_iter();
+            let mut inner = UnzipInner::new(it);
+
+            assert!(inner.next().is_none());
+            assert!(inner.next_back().is_none());
+            assert!(inner.next_either(selector::left_mut).is_none());
+            assert!(inner.next_either(selector::right_mut).is_none());
+            assert!(inner.next_back_either(selector::left_mut).is_none());
+            assert!(inner.next_back_either(selector::right_mut).is_none());
+        }
+
+        #[test]
+        fn test_unzip_inner_exact_size() {
+            let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
+            let mut inner = UnzipInner::new(it);
+
+            assert_eq!(inner.len_either(selector::left), 3);
+            assert_eq!(inner.len_either(selector::right), 3);
+
+            inner.next();
+            assert_eq!(inner.len_either(selector::left), 3);
+
+            inner.next_either(selector::left_mut);
+            assert_eq!(inner.len_either(selector::left), 2);
+
+            inner.next_back();
+            assert_eq!(inner.len_either(selector::left), 2);
+
+            inner.next_back_either(selector::left_mut);
+            assert_eq!(inner.len_either(selector::left), 1);
+        }
     }
 }
