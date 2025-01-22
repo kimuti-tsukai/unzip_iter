@@ -200,6 +200,21 @@ impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> IntoRefPairs<'a, A, B, I>
     }
 }
 
+#[derive(Clone, Debug)]
+struct Buffer<A> {
+    front: VecDeque<A>,
+    back: VecDeque<A>,
+}
+
+impl<A> Buffer<A> {
+    fn new() -> Self {
+        Self {
+            front: VecDeque::new(),
+            back: VecDeque::new(),
+        }
+    }
+}
+
 /// Init
 /// ```txt
 /// [] iter.left  []
@@ -232,24 +247,24 @@ impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> IntoRefPairs<'a, A, B, I>
 #[derive(Clone, Debug)]
 struct UnzipInner<A, B, I: Iterator<Item = (A, B)>> {
     iter: I,
-    left: (VecDeque<A>, VecDeque<A>),
-    right: (VecDeque<B>, VecDeque<B>),
+    left: Buffer<A>,
+    right: Buffer<B>,
 }
 
 impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
     fn new(iter: I) -> Self {
         Self {
             iter,
-            left: (VecDeque::new(), VecDeque::new()),
-            right: (VecDeque::new(), VecDeque::new()),
+            left: Buffer::new(),
+            right: Buffer::new(),
         }
     }
 
     fn next(&mut self) -> Option<()> {
         let (a, b) = self.iter.next()?;
 
-        self.left.0.push_back(a);
-        self.right.0.push_back(b);
+        self.left.front.push_back(a);
+        self.right.front.push_back(b);
 
         Some(())
     }
@@ -277,28 +292,28 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
     where
         for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
     {
-        selector(&mut self.left.0, &mut self.right.0)
+        selector(&mut self.left.front, &mut self.right.front)
     }
 
     fn select_front_queue<F, O>(&self, selector: F) -> &VecDeque<O>
     where
         for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
     {
-        selector(&self.left.0, &self.right.0)
+        selector(&self.left.front, &self.right.front)
     }
 
     fn select_back_queue_mut<F, O>(&mut self, selector: F) -> &mut VecDeque<O>
     where
         for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
     {
-        selector(&mut self.left.1, &mut self.right.1)
+        selector(&mut self.left.back, &mut self.right.back)
     }
 
     fn select_back_queue<F, O>(&self, selector: F) -> &VecDeque<O>
     where
         for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
     {
-        selector(&self.left.1, &self.right.1)
+        selector(&self.left.back, &self.right.back)
     }
 }
 
@@ -306,8 +321,8 @@ impl<A, B, I: DoubleEndedIterator<Item = (A, B)>> UnzipInner<A, B, I> {
     fn next_back(&mut self) -> Option<()> {
         let (a, b) = self.iter.next_back()?;
 
-        self.left.1.push_front(a);
-        self.right.1.push_front(b);
+        self.left.back.push_front(a);
+        self.right.back.push_front(b);
 
         Some(())
     }
