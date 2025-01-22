@@ -200,27 +200,56 @@ impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> IntoRefPairs<'a, A, B, I>
     }
 }
 
+/// Init
+/// ```txt
+/// [] iter.left  []
+/// [] iter.right []
+/// ```
+///
+/// Next.left // Consume left and store right
+/// ```txt
+/// [   ] iter.left  [] // Consume value
+/// [ o ] iter.right [] // Store value
+/// ```
+///
+/// Next.left
+/// ```txt
+/// [     ] iter.left  []
+/// [ o o ] iter.right [] // Store value on the right
+/// ```
+///
+/// Next.right // Consume right stores
+/// ```txt
+/// [   ] iter.left  []
+/// [ o ] iter.right [] // Consume value on front
+/// ```
+///
+/// NextBack.right // Consume right and store left
+/// ```txt
+/// [   ] iter.left  [ o ] // Store value
+/// [ o ] iter.right [   ] // Consume value
+/// ```
 #[derive(Clone, Debug)]
 struct UnzipInner<A, B, I: Iterator<Item = (A, B)>> {
     iter: I,
-    left: VecDeque<A>,
-    right: VecDeque<B>,
+    left: (VecDeque<A>, VecDeque<A>),
+    right: (VecDeque<B>, VecDeque<B>),
 }
 
 impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
     fn new(iter: I) -> Self {
         Self {
             iter,
-            left: VecDeque::new(),
-            right: VecDeque::new(),
+            left: (VecDeque::new(), VecDeque::new()),
+            right: (VecDeque::new(), VecDeque::new()),
         }
     }
 
     fn next(&mut self) -> Option<()> {
         let (a, b) = self.iter.next()?;
 
-        self.left.push_back(a);
-        self.right.push_back(b);
+        self.left.0.push_back(a);
+        self.right.0.push_back(b);
 
         Some(())
     }
@@ -229,28 +258,77 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
     where
         for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
     {
-        let q = self.select_queue_mut(&f);
+        let q = self.select_front_queue_mut(&f);
 
-        q.pop_front().or_else(|| {
-            self.next();
+        q.pop_front()
+            .or_else(|| {
+                self.next();
 
-            let q = self.select_queue_mut(&f);
-            q.pop_front()
-        })
+                let q = self.select_front_queue_mut(&f);
+                q.pop_front()
+            })
+            .or_else(|| {
+                let q = self.select_back_queue_mut(&f);
+                q.pop_front()
+            })
     }
 
-    fn select_queue_mut<F, O>(&mut self, selector: F) -> &mut VecDeque<O>
+    fn select_front_queue_mut<F, O>(&mut self, selector: F) -> &mut VecDeque<O>
     where
         for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
     {
-        selector(&mut self.left, &mut self.right)
+        selector(&mut self.left.0, &mut self.right.0)
     }
 
-    fn select_queue<F, O>(&self, selector: F) -> &VecDeque<O>
+    fn select_front_queue<F, O>(&self, selector: F) -> &VecDeque<O>
     where
         for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
     {
-        selector(&self.left, &self.right)
+        selector(&self.left.0, &self.right.0)
+    }
+
+    fn select_back_queue_mut<F, O>(&mut self, selector: F) -> &mut VecDeque<O>
+    where
+        for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
+    {
+        selector(&mut self.left.1, &mut self.right.1)
+    }
+
+    fn select_back_queue<F, O>(&self, selector: F) -> &VecDeque<O>
+    where
+        for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
+    {
+        selector(&self.left.1, &self.right.1)
+    }
+}
+
+impl<A, B, I: DoubleEndedIterator<Item = (A, B)>> UnzipInner<A, B, I> {
+    fn next_back(&mut self) -> Option<()> {
+        let (a, b) = self.iter.next_back()?;
+
+        self.left.1.push_front(a);
+        self.right.1.push_front(b);
+
+        Some(())
+    }
+
+    fn next_back_either<F, O>(&mut self, f: F) -> Option<O>
+    where
+        for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
+    {
+        let q = self.select_back_queue_mut(&f);
+
+        q.pop_back()
+            .or_else(|| {
+                self.next_back();
+
+                let q = self.select_back_queue_mut(&f);
+                q.pop_back()
+            })
+            .or_else(|| {
+                let q = self.select_front_queue_mut(&f);
+                q.pop_back()
+            })
     }
 }
 
@@ -259,7 +337,7 @@ impl<A, B, I: Iterator<Item = (A, B)> + ExactSizeIterator> UnzipInner<A, B, I> {
     where
         for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
     {
-        self.select_queue(f).len() + self.iter.len()
+        self.select_front_queue(&f).len() + self.iter.len() + self.select_back_queue(&f).len()
     }
 }
 
@@ -326,6 +404,17 @@ where
         self.inner
             .borrow_mut()
             .next_either(self.queue_selector.sel_mut)
+    }
+}
+
+impl<A, B, I, O> DoubleEndedIterator for UnzipIter<A, B, I, O>
+where
+    I: DoubleEndedIterator<Item = (A, B)>,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.inner
+            .borrow_mut()
+            .next_back_either(self.queue_selector.sel_mut)
     }
 }
 
@@ -548,5 +637,48 @@ mod tests {
         let _ = thread.join();
 
         right.next();
+    }
+
+    #[test]
+    fn next_back_iter() {
+        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+        let (_left, mut right) = it.unzip_iter();
+
+        assert_eq!(right.next_back(), Some(4));
+        assert_eq!(right.next_back(), Some(3));
+        assert_eq!(right.next_back(), Some(2));
+        assert_eq!(right.next_back(), None);
+    }
+
+    #[test]
+    fn next_mixture() {
+        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+        let (mut left, mut right) = it.unzip_iter();
+
+        assert_eq!(left.next(), Some(1));
+        assert_eq!(right.next_back(), Some(4));
+
+        assert_eq!(left.next(), Some(3));
+        assert_eq!(right.next(), Some(2));
+
+        assert_eq!(left.next_back(), Some(5));
+        assert_eq!(right.next_back(), Some(3));
+
+        assert_eq!(left.next_back(), None);
+        assert_eq!(right.next(), None);
+    }
+
+    #[test]
+    fn rev_loop() {
+        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+        let (left, right) = it.unzip_iter();
+
+        let mut v = Vec::new();
+
+        for (l, r) in left.zip(right.rev()) {
+            v.push((l, r));
+        }
+
+        assert_eq!(v, vec![(1, 4), (3, 3), (5, 2)]);
     }
 }
