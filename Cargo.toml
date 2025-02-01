@@ -6,5 +6,6 @@ repository = "https://github.com/kimuti-tsukai/unzip_iter"
 license = "MIT"
 authors = ["kimuti_tsukai <ruster354@gmail.com>"]
 description = "Unzip an iterator to iterators"
+readme = "README.md"
 
 [dependencies]
