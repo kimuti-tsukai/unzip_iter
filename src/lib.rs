@@ -21,6 +21,7 @@ use std::{
     collections::VecDeque,
     fmt::Debug,
     iter::FusedIterator,
+    ops::{Deref, DerefMut},
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -284,6 +285,19 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
     {
         selector(&self.left.back, &self.right.back)
     }
+
+    fn size_hint_either<F, O>(&self, f: F) -> (usize, Option<usize>)
+    where
+        for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
+    {
+        let (min, max) = self.iter.size_hint();
+
+        let buffer_len = self.select_front_queue(&f).len() + self.select_back_queue(&f).len();
+        let min = min + buffer_len;
+        let max = max.map(|max| max + buffer_len);
+
+        (min, max)
+    }
 }
 
 impl<A, B, I: DoubleEndedIterator<Item = (A, B)>> UnzipInner<A, B, I> {
@@ -316,20 +330,19 @@ impl<A, B, I: DoubleEndedIterator<Item = (A, B)>> UnzipInner<A, B, I> {
     }
 }
 
-impl<A, B, I: Iterator<Item = (A, B)> + ExactSizeIterator> UnzipInner<A, B, I> {
-    fn len_either<F, O>(&self, f: F) -> usize
-    where
-        for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
-    {
-        self.select_front_queue(&f).len() + self.iter.len() + self.select_back_queue(&f).len()
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Selector<A, B, O> {
     pub(crate) sel_mut: for<'a> fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
     pub(crate) sel_ref: for<'a> fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
 }
+
+impl<A, B, O> Clone for Selector<A, B, O> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<A, B, O> Copy for Selector<A, B, O> {}
 
 mod selector {
     use std::collections::VecDeque;
@@ -357,6 +370,30 @@ mod selector {
     }
 }
 
+trait UnzipIterAPI<A, B, I: Iterator<Item = (A, B)>, O> {
+    fn get_inner(&self) -> impl Deref<Target = UnzipInner<A, B, I>>;
+    fn get_inner_mut(&mut self) -> impl DerefMut<Target = UnzipInner<A, B, I>>;
+    fn get_queue_selector(&self) -> Selector<A, B, O>;
+
+    fn next(&mut self) -> Option<O> {
+        let selector = self.get_queue_selector();
+        self.get_inner_mut().next_either(selector.sel_mut)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let selector = self.get_queue_selector();
+        self.get_inner().size_hint_either(selector.sel_ref)
+    }
+
+    fn next_back(&mut self) -> Option<O>
+    where
+        I: DoubleEndedIterator<Item = (A, B)>,
+    {
+        let selector = self.get_queue_selector();
+        self.get_inner_mut().next_back_either(selector.sel_mut)
+    }
+}
+
 /// An iterator that yields one side of a tuple from the original iterator.
 ///
 /// [`UnzipIter`] is produced by the [`unzip_iter`](crate::Unzip::unzip_iter) method of the [`Unzip`] trait. It is responsible for iterating over
@@ -378,6 +415,23 @@ pub struct UnzipIter<A, B, I: Iterator<Item = (A, B)>, O> {
     inner: Rc<RefCell<UnzipInner<A, B, I>>>,
 }
 
+impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for UnzipIter<A, B, I, O>
+where
+    I: Iterator<Item = (A, B)>,
+{
+    fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
+        self.inner.borrow()
+    }
+
+    fn get_inner_mut(&mut self) -> impl std::ops::DerefMut<Target = UnzipInner<A, B, I>> {
+        self.inner.borrow_mut()
+    }
+
+    fn get_queue_selector(&self) -> Selector<A, B, O> {
+        self.queue_selector
+    }
+}
+
 impl<A, B, I, O> Iterator for UnzipIter<A, B, I, O>
 where
     I: Iterator<Item = (A, B)>,
@@ -385,9 +439,11 @@ where
     type Item = O;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .borrow_mut()
-            .next_either(self.queue_selector.sel_mut)
+        UnzipIterAPI::next(self)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        UnzipIterAPI::size_hint(self)
     }
 }
 
@@ -396,19 +452,13 @@ where
     I: DoubleEndedIterator<Item = (A, B)>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.inner
-            .borrow_mut()
-            .next_back_either(self.queue_selector.sel_mut)
+        UnzipIterAPI::next_back(self)
     }
 }
 
-impl<A, B, I, O> ExactSizeIterator for UnzipIter<A, B, I, O>
-where
-    I: Iterator<Item = (A, B)> + ExactSizeIterator,
+impl<A, B, I, O> ExactSizeIterator for UnzipIter<A, B, I, O> where
+    I: Iterator<Item = (A, B)> + ExactSizeIterator
 {
-    fn len(&self) -> usize {
-        self.inner.borrow().len_either(self.queue_selector.sel_ref)
-    }
 }
 
 impl<A, B, I, O> FusedIterator for UnzipIter<A, B, I, O> where
@@ -461,6 +511,27 @@ pub struct SyncUnzipIter<A, B, I: Iterator<Item = (A, B)>, O> {
     inner: Arc<Mutex<UnzipInner<A, B, I>>>,
 }
 
+impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for SyncUnzipIter<A, B, I, O>
+where
+    I: Iterator<Item = (A, B)>,
+{
+    fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
+        self.inner
+            .lock()
+            .expect("Failed to Lock. Iterator paniced.")
+    }
+
+    fn get_inner_mut(&mut self) -> impl std::ops::DerefMut<Target = UnzipInner<A, B, I>> {
+        self.inner
+            .lock()
+            .expect("Failed to Lock. Iterator paniced.")
+    }
+
+    fn get_queue_selector(&self) -> Selector<A, B, O> {
+        self.queue_selector
+    }
+}
+
 impl<A, B, I, O> Iterator for SyncUnzipIter<A, B, I, O>
 where
     I: Iterator<Item = (A, B)>,
@@ -468,10 +539,11 @@ where
     type Item = O;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .lock()
-            .expect("Failed to Lock. Iterator paniced.")
-            .next_either(self.queue_selector.sel_mut)
+        UnzipIterAPI::next(self)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        UnzipIterAPI::size_hint(self)
     }
 }
 
@@ -480,23 +552,13 @@ where
     I: DoubleEndedIterator<Item = (A, B)>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.inner
-            .lock()
-            .expect("Failed to Lock. Iterator paniced.")
-            .next_back_either(self.queue_selector.sel_mut)
+        UnzipIterAPI::next_back(self)
     }
 }
 
-impl<A, B, I, O> ExactSizeIterator for SyncUnzipIter<A, B, I, O>
-where
-    I: Iterator<Item = (A, B)> + ExactSizeIterator,
+impl<A, B, I, O> ExactSizeIterator for SyncUnzipIter<A, B, I, O> where
+    I: Iterator<Item = (A, B)> + ExactSizeIterator
 {
-    fn len(&self) -> usize {
-        self.inner
-            .lock()
-            .expect("Failed to Lock. Iterator paniced.")
-            .len_either(self.queue_selector.sel_ref)
-    }
 }
 
 impl<A, B, I, O> FusedIterator for SyncUnzipIter<A, B, I, O> where
@@ -589,10 +651,9 @@ impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> IntoRefPairs<'a, A, B, I>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     mod unzip_iter_tests {
-        use super::*;
+        use crate::{Unzip, UnzipIter};
 
         #[test]
         fn test_basic() {
@@ -680,11 +741,26 @@ mod tests {
 
             assert_eq!(v, vec![(1, 4), (3, 3), (5, 2)]);
         }
+
+        #[test]
+        fn test_not_clone() {
+            #[derive(Debug, PartialEq, Eq)]
+            struct NotClone;
+
+            let it = vec![(NotClone, NotClone)].into_iter();
+            let (left, right) = it.unzip_iter();
+
+            assert!(left.eq(vec![NotClone].into_iter()));
+            assert!(right.eq(vec![NotClone].into_iter()));
+        }
     }
 
     mod sync_unzip_iter_tests {
-        use super::*;
-        use std::thread;
+        use crate::{selector, Selector, SyncUnzipIter, Unzip, UnzipInner};
+        use std::{
+            sync::{Arc, Mutex},
+            thread,
+        };
 
         #[test]
         fn test_basic() {
@@ -859,7 +935,9 @@ mod tests {
     }
 
     mod unzip_inner_tests {
-        use super::*;
+        use std::collections::VecDeque;
+
+        use crate::{selector, UnzipInner};
 
         /// Documentation test of [`UnzipInner`]
         #[test]
@@ -978,20 +1056,20 @@ mod tests {
             let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
             let mut inner = UnzipInner::new(it);
 
-            assert_eq!(inner.len_either(selector::left), 3);
-            assert_eq!(inner.len_either(selector::right), 3);
+            assert_eq!(inner.size_hint_either(selector::left), (3, Some(3)));
+            assert_eq!(inner.size_hint_either(selector::right), (3, Some(3)));
 
             inner.next();
-            assert_eq!(inner.len_either(selector::left), 3);
+            assert_eq!(inner.size_hint_either(selector::left), (3, Some(3)));
 
             inner.next_either(selector::left_mut);
-            assert_eq!(inner.len_either(selector::left), 2);
+            assert_eq!(inner.size_hint_either(selector::left), (2, Some(2)));
 
             inner.next_back();
-            assert_eq!(inner.len_either(selector::left), 2);
+            assert_eq!(inner.size_hint_either(selector::left), (2, Some(2)));
 
             inner.next_back_either(selector::left_mut);
-            assert_eq!(inner.len_either(selector::left), 1);
+            assert_eq!(inner.size_hint_either(selector::left), (1, Some(1)));
         }
     }
 }
