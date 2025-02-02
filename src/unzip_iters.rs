@@ -1,6 +1,5 @@
 use std::{
     cell::RefCell,
-    ops::{Deref, DerefMut},
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -16,6 +15,8 @@ pub mod unzip_iter;
 pub mod sync_unzip_iter;
 
 mod unzip_inner;
+
+mod unzip_api;
 
 mod selector;
 
@@ -150,38 +151,5 @@ where
                 Arc::clone(&rc),
             ),
         )
-    }
-}
-
-/// API for UnzipIter
-trait UnzipIterAPI<A, B, I: Iterator<Item = (A, B)>, O> {
-    /// Get UnzipInner
-    fn get_inner(&self) -> impl Deref<Target = UnzipInner<A, B, I>>;
-
-    /// Get UnzipInner as mutable
-    fn get_inner_mut(&mut self) -> impl DerefMut<Target = UnzipInner<A, B, I>>;
-
-    /// Get Selector
-    fn get_queue_selector(&self) -> Selector<A, B, O>;
-
-    /// Get next value
-    fn next(&mut self) -> Option<O> {
-        let selector = self.get_queue_selector();
-        self.get_inner_mut().next_either(selector.sel_mut)
-    }
-
-    /// Get size hint
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let selector = self.get_queue_selector();
-        self.get_inner().size_hint_either(selector.sel_ref)
-    }
-
-    /// Get next back value
-    fn next_back(&mut self) -> Option<O>
-    where
-        I: DoubleEndedIterator<Item = (A, B)>,
-    {
-        let selector = self.get_queue_selector();
-        self.get_inner_mut().next_back_either(selector.sel_mut)
     }
 }

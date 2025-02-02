@@ -5,7 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use super::{selector::Selector, unzip_inner::UnzipInner, UnzipIterAPI};
+use super::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inner::UnzipInner};
 
 /// An iterator that yields one side of a tuple from the original iterator.
 ///
@@ -22,10 +22,20 @@ use super::{selector::Selector, unzip_inner::UnzipInner, UnzipIterAPI};
 /// assert!(numbers.eq(vec![1, 2, 3].into_iter()));
 /// assert!(letters.eq(vec!["a", "b", "c"].into_iter()));
 /// ```
-#[derive(Clone)]
 pub struct UnzipIter<A, B, I: Iterator<Item = (A, B)>, O> {
     queue_selector: Selector<A, B, O>,
     inner: Rc<RefCell<UnzipInner<A, B, I>>>,
+}
+
+impl<A, B, I, O> Clone for UnzipIter<A, B, I, O>
+where
+    I: Iterator<Item = (A, B)> + Clone,
+    A: Clone,
+    B: Clone,
+{
+    fn clone(&self) -> Self {
+        UnzipIterAPI::clone(self)
+    }
 }
 
 impl<A, B, I, O> UnzipIter<A, B, I, O>
@@ -47,6 +57,10 @@ impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for UnzipIter<A, B, I, O>
 where
     I: Iterator<Item = (A, B)>,
 {
+    fn with_selector(selector: Selector<A, B, O>, inner: UnzipInner<A, B, I>) -> Self {
+        Self::new(selector, Rc::new(RefCell::new(inner)))
+    }
+
     fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
         self.inner.borrow()
     }
@@ -207,5 +221,16 @@ mod tests {
 
         assert!(left.eq(vec![NotClone].into_iter()));
         assert!(right.eq(vec![NotClone].into_iter()));
+    }
+
+    #[test]
+    fn test_clone() {
+        let it = vec![(1, 2), (3, 3), (5, 4)].into_iter();
+        let (left, right) = it.unzip_iter();
+        let left_clone = left.clone();
+
+        assert!(left.eq(vec![1, 3, 5].into_iter()));
+        assert!(left_clone.eq(vec![1, 3, 5].into_iter()));
+        assert!(right.eq(vec![2, 3, 4].into_iter()));
     }
 }
