@@ -14,6 +14,21 @@
 //! assert!(right.eq(vec![2, 3, 4].into_iter()));
 //! ```
 //!
+//! If you want to splitting an iterator over tuples into more than two iterators, you can do as follows:
+//! ```
+//! use unzip_iter::Unzip;
+//!
+//! let it = vec![(1, 2, 3), (4, 5, 6), (7, 8, 9)].into_iter();
+//!
+//! let tuple_iter = it.map(|(a, b, c)| (a, (b, c)));
+//! let (left, right) = tuple_iter.unzip_iter();
+//! let (middle, right) = right.unzip_iter();
+//!
+//! assert!(left.eq(vec![1, 4, 7].into_iter()));
+//! assert!(middle.eq(vec![2, 5, 8].into_iter()));
+//! assert!(right.eq(vec![3, 6, 9].into_iter()));
+//! ```
+//!
 //! The module also provides [`SyncUnzipIter`] for thread-safe usage via [`Arc`](std::sync::Arc) and [`Mutex`](std::sync::Mutex).
 
 pub mod refpairs;
