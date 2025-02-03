@@ -1,7 +1,8 @@
 use std::{
-    fmt::Debug,
+    error::Error,
+    fmt::{Debug, Display},
     iter::FusedIterator,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, TryLockError},
 };
 
 use sync_unzip_lock::SyncUnzipLock;
@@ -13,6 +14,17 @@ use super::{
 };
 
 pub mod sync_unzip_lock;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct WouldBlockError;
+
+impl Display for WouldBlockError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "try_lock failed because the operation would block")
+    }
+}
+
+impl Error for WouldBlockError {}
 
 /// A thread-safe iterator that yields one side of a tuple from the original iterator.
 ///
@@ -79,6 +91,16 @@ where
             .expect("Failed to Lock. Iterator paniced.");
 
         SyncUnzipLock::new(self.queue_selector, locked)
+    }
+
+    pub fn try_lock(&self) -> Result<SyncUnzipLock<'_, A, B, I, O>, WouldBlockError> {
+        self.inner
+            .try_lock()
+            .map(|locked| SyncUnzipLock::new(self.queue_selector, locked))
+            .map_err(|e| match e {
+                TryLockError::WouldBlock => WouldBlockError {},
+                TryLockError::Poisoned(_) => panic!("Iterator paniced"),
+            })
     }
 }
 
