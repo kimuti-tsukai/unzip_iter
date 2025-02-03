@@ -1,6 +1,5 @@
 use std::{
-    error::Error,
-    fmt::{Debug, Display},
+    fmt::Debug,
     iter::FusedIterator,
     sync::{Arc, Mutex},
 };
@@ -13,25 +12,41 @@ use super::{
     unzip_inner::UnzipInner,
 };
 
+use errors::*;
+
 pub mod sync_unzip_lock;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TryLockError {
-    WouldBlock,
-    Paniced,
-}
+pub mod errors {
+    use std::{error::Error, fmt::Display};
 
-impl Display for TryLockError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::WouldBlock => write!(f, "try_lock failed because the operation would block"),
-            Self::Paniced => write!(f, "try_lock failed because the inner iterator paniced"),
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub enum TryLockError {
+        WouldBlock,
+        Paniced,
+    }
+
+    impl Display for TryLockError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::WouldBlock => write!(f, "try_lock failed because the operation would block"),
+                Self::Paniced => write!(f, "try_lock failed because the inner iterator paniced"),
+            }
         }
     }
+
+    impl Error for TryLockError {}
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub struct LockError;
+
+    impl Display for LockError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Failed to Lock. Iterator paniced.")
+        }
+    }
+
+    impl Error for LockError {}
 }
-
-impl Error for TryLockError {}
-
 /// A thread-safe iterator that yields one side of a tuple from the original iterator.
 ///
 /// [`SyncUnzipIter`] is created by the [`unzip_iter_sync`](crate::Unzip::unzip_iter_sync) method of the [`Unzip`](crate::Unzip) trait.
@@ -90,13 +105,11 @@ where
         }
     }
 
-    pub fn lock(&self) -> SyncUnzipLock<'_, A, B, I, O> {
-        let locked = self
-            .inner
+    pub fn lock(&self) -> Result<SyncUnzipLock<'_, A, B, I, O>, LockError> {
+        self.inner
             .lock()
-            .expect("Failed to Lock. Iterator paniced.");
-
-        SyncUnzipLock::new(self.queue_selector, locked)
+            .map(|locked| SyncUnzipLock::new(self.queue_selector, locked))
+            .map_err(|_| LockError)
     }
 
     pub fn try_lock(&self) -> Result<SyncUnzipLock<'_, A, B, I, O>, TryLockError> {

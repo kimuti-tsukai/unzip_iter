@@ -32,7 +32,7 @@ use crate::unzip_iters::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inne
 ///
 /// // The lock is automatically released at the end of this block
 /// {
-///     let mut lock = left.lock();
+///     let mut lock = left.lock().unwrap();
 ///     assert_eq!(lock.next(), Some(1));
 ///     assert_eq!(lock.next(), Some(2));
 ///     assert_eq!(lock.next(), Some(3));
@@ -125,7 +125,7 @@ mod tests {
         let (left, _) = it.unzip_iter_sync();
 
         // 一度のロックで複数の要素を取得
-        let mut lock = left.lock();
+        let mut lock = left.lock().unwrap();
         assert_eq!(lock.next(), Some(1));
         assert_eq!(lock.next(), Some(2));
         assert_eq!(lock.next(), Some(3));
@@ -137,7 +137,7 @@ mod tests {
         let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
         let (_, right) = it.unzip_iter_sync();
 
-        let mut lock = right.lock();
+        let mut lock = right.lock().unwrap();
         assert_eq!(lock.next(), Some("a"));
         assert_eq!(lock.next_back(), Some("c"));
         assert_eq!(lock.next(), Some("b"));
@@ -150,7 +150,7 @@ mod tests {
         let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
         let (left, _) = it.unzip_iter_sync();
 
-        let mut lock = left.lock();
+        let mut lock = left.lock().unwrap();
         assert_eq!(lock.size_hint(), (3, Some(3)));
 
         lock.next();
@@ -169,7 +169,7 @@ mod tests {
         let (left, _) = it.unzip_iter_sync();
 
         // 前方と後方からの混合イテレーション
-        let mut lock = left.lock();
+        let mut lock = left.lock().unwrap();
         assert_eq!(lock.next(), Some(1));
         assert_eq!(lock.next_back(), Some(4));
         assert_eq!(lock.next(), Some(2));
@@ -185,14 +185,14 @@ mod tests {
 
         // 左側のロックを取得して一部イテレート
         {
-            let mut left_lock = left.lock();
+            let mut left_lock = left.lock().unwrap();
             assert_eq!(left_lock.next(), Some(1));
             assert_eq!(left_lock.next(), Some(2));
             // ここでleft_lockがドロップされる
         }
 
         // 右側のロックを取得して残りをイテレート
-        let mut right_lock = right.lock();
+        let mut right_lock = right.lock().unwrap();
         assert_eq!(right_lock.next(), Some("a"));
         assert_eq!(right_lock.next(), Some("b"));
         assert_eq!(right_lock.next(), Some("c"));
@@ -212,7 +212,7 @@ mod tests {
         let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
         let (left, _) = it.unzip_iter_sync();
 
-        let _lock = left.lock();
+        let _lock = left.lock().unwrap();
 
         let lock = left.try_lock().unwrap_err();
         assert_eq!(lock, TryLockError::WouldBlock);
