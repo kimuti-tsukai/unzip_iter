@@ -117,7 +117,7 @@ impl<A, B, I, O> ExactSizeIterator for SyncUnzipLock<'_, A, B, I, O> where
 
 #[cfg(test)]
 mod tests {
-    use crate::{unzip_iters::sync_unzip_iter::WouldBlockError, Unzip};
+    use crate::{unzip_iters::sync_unzip_iter::TryLockError, Unzip};
 
     #[test]
     fn test_continuous_next() {
@@ -215,6 +215,6 @@ mod tests {
         let _lock = left.lock();
 
         let lock = left.try_lock().unwrap_err();
-        assert_eq!(lock, (WouldBlockError));
+        assert_eq!(lock, TryLockError::WouldBlock);
     }
 }
