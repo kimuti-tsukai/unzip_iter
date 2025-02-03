@@ -4,7 +4,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{selector::Selector, unzip_api::{UnzipInitialize, UnzipIterAPI}, unzip_inner::UnzipInner};
+use sync_unzip_lock::SyncUnzipLock;
+
+use super::{
+    selector::Selector,
+    unzip_api::{UnzipInitialize, UnzipIterAPI},
+    unzip_inner::UnzipInner,
+};
 
 pub mod sync_unzip_lock;
 
@@ -64,6 +70,15 @@ where
             queue_selector,
             inner: arc,
         }
+    }
+
+    pub fn lock(&self) -> SyncUnzipLock<'_, A, B, I, O> {
+        let locked = self
+            .inner
+            .lock()
+            .expect("Failed to Lock. Iterator paniced.");
+
+        SyncUnzipLock::new(self.queue_selector, locked)
     }
 }
 
@@ -154,10 +169,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::unzip_iters::{
-        selector::Selector,
-        SyncUnzipIter, Unzip, UnzipInner,
-    };
+    use crate::unzip_iters::{selector::Selector, SyncUnzipIter, Unzip, UnzipInner};
     use std::{
         sync::{Arc, Mutex},
         thread,

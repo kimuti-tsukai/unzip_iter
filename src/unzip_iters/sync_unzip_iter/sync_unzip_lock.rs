@@ -10,6 +10,18 @@ pub struct SyncUnzipLock<'a, A, B, I: Iterator<Item = (A, B)>, O> {
     lock: MutexGuard<'a, UnzipInner<A, B, I>>,
 }
 
+impl<'a, A, B, I, O> SyncUnzipLock<'a, A, B, I, O>
+where
+    I: Iterator<Item = (A, B)>,
+{
+    pub(super) fn new(
+        selector: Selector<A, B, O>,
+        lock: MutexGuard<'a, UnzipInner<A, B, I>>,
+    ) -> Self {
+        Self { selector, lock }
+    }
+}
+
 impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for SyncUnzipLock<'_, A, B, I, O>
 where
     I: Iterator<Item = (A, B)>,
