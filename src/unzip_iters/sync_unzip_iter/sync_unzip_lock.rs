@@ -1,4 +1,7 @@
-use std::{ops::{Deref, DerefMut}, sync::MutexGuard};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::MutexGuard,
+};
 
 use crate::unzip_iters::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inner::UnzipInner};
 
