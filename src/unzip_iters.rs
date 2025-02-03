@@ -1,14 +1,7 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
-
 pub use sync_unzip_iter::SyncUnzipIter;
-pub use unzip_iter::UnzipIter;
-
-use selector::Selector;
+use unzip_api::UnzipInitialize;
 use unzip_inner::UnzipInner;
+pub use unzip_iter::UnzipIter;
 
 pub mod unzip_iter;
 
@@ -107,23 +100,10 @@ where
         UnzipIter<Self::Left, Self::Right, Self, Self::Left>,
         UnzipIter<Self::Left, Self::Right, Self, Self::Right>,
     ) {
-        let rc = Rc::new(RefCell::new(UnzipInner::new(self)));
+        let inner = UnzipInner::new(self);
 
-        (
-            UnzipIter::new(
-                Selector {
-                    sel_mut: selector::left_mut,
-                    sel_ref: selector::left,
-                },
-                Rc::clone(&rc),
-            ),
-            UnzipIter::new(
-                Selector {
-                    sel_mut: selector::right_mut,
-                    sel_ref: selector::right,
-                },
-                Rc::clone(&rc),
-            ),
+        <UnzipIter<Self::Left, Self::Right, Self, Self::Left> as UnzipInitialize<_, _, _, _>>::unzip(
+            inner,
         )
     }
 
@@ -133,23 +113,8 @@ where
         SyncUnzipIter<Self::Left, Self::Right, Self, Self::Left>,
         SyncUnzipIter<Self::Left, Self::Right, Self, Self::Right>,
     ) {
-        let rc = Arc::new(Mutex::new(UnzipInner::new(self)));
+        let inner = UnzipInner::new(self);
 
-        (
-            SyncUnzipIter::new(
-                Selector {
-                    sel_mut: selector::left_mut,
-                    sel_ref: selector::left,
-                },
-                Arc::clone(&rc),
-            ),
-            SyncUnzipIter::new(
-                Selector {
-                    sel_mut: selector::right_mut,
-                    sel_ref: selector::right,
-                },
-                Arc::clone(&rc),
-            ),
-        )
+        <SyncUnzipIter<Self::Left, Self::Right, Self, Self::Left> as UnzipInitialize<_, _, _, _>>::unzip(inner)
     }
 }

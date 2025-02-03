@@ -4,7 +4,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inner::UnzipInner};
+use super::{selector::Selector, unzip_api::{UnzipInitialize, UnzipIterAPI}, unzip_inner::UnzipInner};
+
+pub mod sync_unzip_lock;
 
 /// A thread-safe iterator that yields one side of a tuple from the original iterator.
 ///
@@ -65,14 +67,28 @@ where
     }
 }
 
+impl<A, B, I, O> UnzipInitialize<A, B, I, O> for SyncUnzipIter<A, B, I, O>
+where
+    I: Iterator<Item = (A, B)>,
+{
+    type Unzip = (SyncUnzipIter<A, B, I, A>, SyncUnzipIter<A, B, I, B>);
+
+    fn unzip(inner: UnzipInner<A, B, I>) -> Self::Unzip {
+        let arc = Arc::new(Mutex::new(inner));
+        let left = SyncUnzipIter::new(Selector::<A, B, O>::LEFT, arc.clone());
+        let right = SyncUnzipIter::new(Selector::<A, B, O>::RIGHT, arc.clone());
+        (left, right)
+    }
+
+    fn with_selector(selector: Selector<A, B, O>, inner: UnzipInner<A, B, I>) -> Self {
+        Self::new(selector, Arc::new(Mutex::new(inner)))
+    }
+}
+
 impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for SyncUnzipIter<A, B, I, O>
 where
     I: Iterator<Item = (A, B)>,
 {
-    fn with_selector(selector: Selector<A, B, O>, inner: UnzipInner<A, B, I>) -> Self {
-        Self::new(selector, Arc::new(Mutex::new(inner)))
-    }
-
     fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
         self.inner
             .lock()
@@ -139,7 +155,7 @@ where
 mod tests {
 
     use crate::unzip_iters::{
-        selector::{self, Selector},
+        selector::Selector,
         SyncUnzipIter, Unzip, UnzipInner,
     };
     use std::{
@@ -153,18 +169,12 @@ mod tests {
         let inner = Arc::new(Mutex::new(UnzipInner::new(it)));
 
         let left_iter = SyncUnzipIter {
-            queue_selector: Selector {
-                sel_mut: selector::left_mut,
-                sel_ref: selector::left,
-            },
+            queue_selector: Selector::<i32, i32, i32>::LEFT,
             inner: Arc::clone(&inner),
         };
 
         let right_iter = SyncUnzipIter {
-            queue_selector: Selector {
-                sel_mut: selector::right_mut,
-                sel_ref: selector::right,
-            },
+            queue_selector: Selector::<i32, i32, i32>::RIGHT,
             inner,
         };
 

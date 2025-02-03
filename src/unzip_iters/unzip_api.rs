@@ -2,11 +2,18 @@ use std::ops::{Deref, DerefMut};
 
 use super::{selector::Selector, unzip_inner::UnzipInner};
 
+pub trait UnzipInitialize<A, B, I: Iterator<Item = (A, B)>, O> {
+    type Unzip;
+
+    /// Create a new Unziped iterator from an UnzipInner
+    fn unzip(inner: UnzipInner<A, B, I>) -> Self::Unzip;
+
+    /// Create a new Unziped iterator from a Selector and an UnzipInner
+    fn with_selector(selector: Selector<A, B, O>, inner: UnzipInner<A, B, I>) -> Self;
+}
+
 /// API for UnzipIter
 pub trait UnzipIterAPI<A, B, I: Iterator<Item = (A, B)>, O> {
-    /// Create a new UnzipIter from an UnzipInner and a Selector
-    fn with_selector(selector: Selector<A, B, O>, inner: UnzipInner<A, B, I>) -> Self;
-
     /// Get UnzipInner
     fn get_inner(&self) -> impl Deref<Target = UnzipInner<A, B, I>>;
 
@@ -18,7 +25,7 @@ pub trait UnzipIterAPI<A, B, I: Iterator<Item = (A, B)>, O> {
 
     fn clone(&self) -> Self
     where
-        Self: Sized,
+        Self: Sized + UnzipInitialize<A, B, I, O>,
         UnzipInner<A, B, I>: Clone,
     {
         let inner = self.get_inner().clone();

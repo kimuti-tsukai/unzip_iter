@@ -5,7 +5,11 @@ use std::{
     rc::Rc,
 };
 
-use super::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inner::UnzipInner};
+use super::{
+    selector::Selector,
+    unzip_api::{UnzipInitialize, UnzipIterAPI},
+    unzip_inner::UnzipInner,
+};
 
 /// An iterator that yields one side of a tuple from the original iterator.
 ///
@@ -53,14 +57,28 @@ where
     }
 }
 
+impl<A, B, I, O> UnzipInitialize<A, B, I, O> for UnzipIter<A, B, I, O>
+where
+    I: Iterator<Item = (A, B)>,
+{
+    type Unzip = (UnzipIter<A, B, I, A>, UnzipIter<A, B, I, B>);
+
+    fn unzip(inner: UnzipInner<A, B, I>) -> Self::Unzip {
+        let rc = Rc::new(RefCell::new(inner));
+        let left = UnzipIter::new(Selector::<A, B, O>::LEFT, rc.clone());
+        let right = UnzipIter::new(Selector::<A, B, O>::RIGHT, rc.clone());
+        (left, right)
+    }
+
+    fn with_selector(selector: Selector<A, B, O>, inner: UnzipInner<A, B, I>) -> Self {
+        Self::new(selector, Rc::new(RefCell::new(inner)))
+    }
+}
+
 impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for UnzipIter<A, B, I, O>
 where
     I: Iterator<Item = (A, B)>,
 {
-    fn with_selector(selector: Selector<A, B, O>, inner: UnzipInner<A, B, I>) -> Self {
-        Self::new(selector, Rc::new(RefCell::new(inner)))
-    }
-
     fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
         self.inner.borrow()
     }
