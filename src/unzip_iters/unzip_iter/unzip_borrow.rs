@@ -15,6 +15,18 @@ where
     borrow: RefMut<'a, UnzipInner<A, B, I>>,
 }
 
+impl<'a, A, B, I, O> UnzipBorrow<'a, A, B, I, O>
+where
+    I: Iterator<Item = (A, B)>,
+{
+    pub(super) fn new(
+        selector: Selector<A, B, O>,
+        borrow: RefMut<'a, UnzipInner<A, B, I>>,
+    ) -> Self {
+        Self { selector, borrow }
+    }
+}
+
 impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for UnzipBorrow<'_, A, B, I, O>
 where
     I: Iterator<Item = (A, B)>,

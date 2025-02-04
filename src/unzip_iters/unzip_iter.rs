@@ -5,6 +5,8 @@ use std::{
     rc::Rc,
 };
 
+use unzip_borrow::UnzipBorrow;
+
 use super::{
     selector::Selector,
     unzip_api::{UnzipInitialize, UnzipIterAPI},
@@ -12,6 +14,17 @@ use super::{
 };
 
 pub mod unzip_borrow;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TryBorrowError;
+
+impl std::fmt::Display for TryBorrowError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "already borrowed")
+    }
+}
+
+impl std::error::Error for TryBorrowError {}
 
 /// An iterator that yields one side of a tuple from the original iterator.
 ///
@@ -31,6 +44,22 @@ pub mod unzip_borrow;
 pub struct UnzipIter<A, B, I: Iterator<Item = (A, B)>, O> {
     queue_selector: Selector<A, B, O>,
     inner: Rc<RefCell<UnzipInner<A, B, I>>>,
+}
+
+impl<A, B, I, O> UnzipIter<A, B, I, O>
+where
+    I: Iterator<Item = (A, B)>,
+{
+    pub fn borrow(&self) -> UnzipBorrow<'_, A, B, I, O> {
+        UnzipBorrow::new(self.queue_selector, self.inner.borrow_mut())
+    }
+
+    pub fn try_borrow(&self) -> Result<UnzipBorrow<'_, A, B, I, O>, TryBorrowError> {
+        self.inner
+            .try_borrow_mut()
+            .map(|borrow| UnzipBorrow::new(self.queue_selector, borrow))
+            .map_err(|_| TryBorrowError)
+    }
 }
 
 impl<A, B, I, O> Clone for UnzipIter<A, B, I, O>
