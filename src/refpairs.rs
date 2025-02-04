@@ -19,7 +19,7 @@ impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> Iterator for RefPairs<'a,
     /// # Examples
     ///
     /// ```
-    /// # use unzip_iter::IntoRefPairs;
+    /// # use unzip_iter::refpairs::IntoRefPairs;
     /// let pairs = vec![(1, 2), (3, 4)];
     /// let mut iter = pairs.iter().ref_pairs();
     ///
@@ -37,7 +37,7 @@ impl<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> Iterator for RefPairs<'a,
 /// It is same as `.map(|(a, b)| (a, b))`.
 /// You can use with [`Unzip`](crate::Unzip) as below.
 /// ```
-/// use unzip_iter::{Unzip, IntoRefPairs};
+/// use unzip_iter::{Unzip, refpairs::IntoRefPairs};
 ///
 /// let it = [(1, 2), (3, 3), (5, 4)].iter().ref_pairs();
 ///
@@ -52,7 +52,7 @@ pub trait IntoRefPairs<'a, A: 'a, B: 'a, I: Iterator<Item = &'a (A, B)>> {
     /// # Examples
     ///
     /// ```
-    /// # use unzip_iter::IntoRefPairs;
+    /// # use unzip_iter::refpairs::IntoRefPairs;
     /// let pairs = vec![(1, 2), (3, 4)];
     /// let ref_pairs = pairs.iter().ref_pairs();
     ///

@@ -62,7 +62,7 @@ pub mod errors {
 ///
 /// # Example
 /// ```
-/// use unzip_iter::{Unzip, SyncUnzipIter};
+/// use unzip_iter::Unzip;
 /// use std::sync::{Arc, Mutex};
 /// use std::thread;
 ///
