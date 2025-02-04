@@ -121,6 +121,10 @@ where
                 std::sync::TryLockError::Poisoned(_) => TryLockError::Paniced,
             })
     }
+
+    pub fn is_paniced(&self) -> bool {
+        self.inner.is_poisoned()
+    }
 }
 
 impl<A, B, I, O> UnzipInitialize<A, B, I, O> for SyncUnzipIter<A, B, I, O>
