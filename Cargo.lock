@@ -4,4 +4,4 @@ version = 4
 
 [[package]]
 name = "unzip_iter"
-version = "0.5.4"
+version = "0.5.5"
