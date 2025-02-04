@@ -30,6 +30,22 @@
 //! ```
 //!
 //! The module also provides [`SyncUnzipIter`](crate::unzip_iters::sync_unzip_iter::SyncUnzipIter) for thread-safe usage via [`Arc`](std::sync::Arc) and [`Mutex`](std::sync::Mutex).
+//!
+//! # Performance Considerations
+//! When calling `next()` multiple times in succession, it's recommended to use `lock()` or `borrow()` methods
+//! to avoid repeated locking/unlocking overhead. For example:
+//! ```
+//! use unzip_iter::Unzip;
+//!
+//! let it = vec![(1, 2), (3, 4)].into_iter();
+//! let (left, right) = it.unzip_iter();
+//!
+//! // More efficient way when calling next() multiple times
+//! let mut left_guard = left.borrow(); // or lock() for SyncUnzipIter
+//! let first = left_guard.next();
+//! let second = left_guard.next();
+//! drop(left_guard);
+//! ```
 
 pub mod refpairs;
 pub mod unzip_iters;
