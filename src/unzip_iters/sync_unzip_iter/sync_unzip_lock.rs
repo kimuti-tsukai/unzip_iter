@@ -1,11 +1,6 @@
-use std::{
-    fmt::Debug,
-    iter::{FusedIterator, Iterator},
-    ops::{Deref, DerefMut},
-    sync::MutexGuard,
-};
+use std::sync::MutexGuard;
 
-use crate::unzip_iters::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inner::UnzipInner};
+use crate::unzip_iters::{unzip_inner::UnzipInner, unzip_lock::UnzipLock};
 
 /// A guard that holds a lock on the shared state of a [`SyncUnzipIter`](super::SyncUnzipIter).
 ///
@@ -38,82 +33,7 @@ use crate::unzip_iters::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inne
 ///     assert_eq!(lock.next(), Some(3));
 /// } // lock is dropped here
 /// ```
-pub struct SyncUnzipLock<'a, A, B, I: Iterator<Item = (A, B)>, O> {
-    selector: Selector<A, B, O>,
-    lock: MutexGuard<'a, UnzipInner<A, B, I>>,
-}
-
-impl<'a, A, B, I, O> SyncUnzipLock<'a, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)>,
-{
-    pub(super) fn new(
-        selector: Selector<A, B, O>,
-        lock: MutexGuard<'a, UnzipInner<A, B, I>>,
-    ) -> Self {
-        Self { selector, lock }
-    }
-}
-
-impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for SyncUnzipLock<'_, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)>,
-{
-    fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
-        self.lock.deref()
-    }
-
-    fn get_inner_mut(&mut self) -> impl std::ops::DerefMut<Target = UnzipInner<A, B, I>> {
-        self.lock.deref_mut()
-    }
-
-    fn get_queue_selector(&self) -> Selector<A, B, O> {
-        self.selector
-    }
-}
-
-impl<A, B, I, O> Iterator for SyncUnzipLock<'_, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)>,
-{
-    type Item = O;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        UnzipIterAPI::next(self)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        UnzipIterAPI::size_hint(self)
-    }
-}
-
-impl<A, B, I, O> DoubleEndedIterator for SyncUnzipLock<'_, A, B, I, O>
-where
-    I: DoubleEndedIterator<Item = (A, B)>,
-{
-    fn next_back(&mut self) -> Option<Self::Item> {
-        UnzipIterAPI::next_back(self)
-    }
-}
-
-impl<A, B, I, O> FusedIterator for SyncUnzipLock<'_, A, B, I, O> where
-    I: FusedIterator<Item = (A, B)>
-{
-}
-
-impl<A, B, I, O> Debug for SyncUnzipLock<'_, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)> + Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SyncUnzipLock {{ ... }}")
-    }
-}
-
-impl<A, B, I, O> ExactSizeIterator for SyncUnzipLock<'_, A, B, I, O> where
-    I: ExactSizeIterator<Item = (A, B)>
-{
-}
+pub type SyncUnzipLock<'a, A, B, I, O> = UnzipLock<MutexGuard<'a, UnzipInner<A, B, I>>, A, B, I, O>;
 
 #[cfg(test)]
 mod tests {

@@ -1,88 +1,39 @@
-use std::{
-    cell::RefMut,
-    fmt::Debug,
-    iter::{ExactSizeIterator, FusedIterator},
-    ops::{Deref, DerefMut},
-};
+use std::cell::RefMut;
 
-use crate::unzip_iters::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inner::UnzipInner};
+use crate::unzip_iters::{unzip_inner::UnzipInner, unzip_lock::UnzipLock};
 
-pub struct UnzipBorrow<'a, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)>,
-{
-    selector: Selector<A, B, O>,
-    borrow: RefMut<'a, UnzipInner<A, B, I>>,
-}
-
-impl<'a, A, B, I, O> UnzipBorrow<'a, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)>,
-{
-    pub(super) fn new(
-        selector: Selector<A, B, O>,
-        borrow: RefMut<'a, UnzipInner<A, B, I>>,
-    ) -> Self {
-        Self { selector, borrow }
-    }
-}
-
-impl<A, B, I, O> UnzipIterAPI<A, B, I, O> for UnzipBorrow<'_, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)>,
-{
-    fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
-        self.borrow.deref()
-    }
-
-    fn get_inner_mut(&mut self) -> impl std::ops::DerefMut<Target = UnzipInner<A, B, I>> {
-        self.borrow.deref_mut()
-    }
-
-    fn get_queue_selector(&self) -> Selector<A, B, O> {
-        self.selector
-    }
-}
-
-impl<A, B, I, O> Iterator for UnzipBorrow<'_, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)>,
-{
-    type Item = O;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        UnzipIterAPI::next(self)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        UnzipIterAPI::size_hint(self)
-    }
-}
-
-impl<A, B, I, O> DoubleEndedIterator for UnzipBorrow<'_, A, B, I, O>
-where
-    I: DoubleEndedIterator<Item = (A, B)>,
-{
-    fn next_back(&mut self) -> Option<Self::Item> {
-        UnzipIterAPI::next_back(self)
-    }
-}
-
-impl<A, B, I, O> ExactSizeIterator for UnzipBorrow<'_, A, B, I, O> where
-    I: ExactSizeIterator<Item = (A, B)>
-{
-}
-
-impl<A, B, I, O> FusedIterator for UnzipBorrow<'_, A, B, I, O> where I: FusedIterator<Item = (A, B)> {}
-
-impl<A, B, I, O> Debug for UnzipBorrow<'_, A, B, I, O>
-where
-    I: Iterator<Item = (A, B)> + Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "UnzipBorrow {{ ... }}")
-    }
-}
+/// A guard that holds a borrow on the internal state of a [`UnzipIter`](super::UnzipIter).
+///
+/// This type provides optimized access to the iterator's elements by maintaining
+/// the borrow for multiple operations. This is particularly useful when you need to
+/// perform multiple consecutive iterations.
+///
+/// # Performance
+/// Using `UnzipBorrow` can significantly improve performance when multiple
+/// consecutive operations are needed, as it avoids the overhead of borrowing
+/// and releasing for each operation.
+///
+/// # Borrow Safety
+/// The borrow is automatically released when the `UnzipBorrow` is dropped.
+/// To avoid panics, ensure that you don't hold multiple borrows simultaneously
+/// and drop the borrow when it's no longer needed.
+///
+/// # Example
+/// ```
+/// use unzip_iter::Unzip;
+///
+/// let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
+/// let (left, _) = it.unzip_iter();
+///
+/// // The borrow is automatically released at the end of this block
+/// {
+///     let mut borrow = left.borrow();
+///     assert_eq!(borrow.next(), Some(1));
+///     assert_eq!(borrow.next(), Some(2));
+///     assert_eq!(borrow.next(), Some(3));
+/// } // borrow is dropped here
+/// ```
+pub type UnzipBorrow<'a, A, B, I, O> = UnzipLock<RefMut<'a, UnzipInner<A, B, I>>, A, B, I, O>;
 
 #[cfg(test)]
 mod tests {

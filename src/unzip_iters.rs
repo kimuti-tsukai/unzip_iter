@@ -11,6 +11,8 @@ mod unzip_inner;
 
 mod unzip_api;
 
+mod unzip_lock;
+
 mod selector;
 
 /// A trait to split an iterator over tuples into two separate iterators.

@@ -105,6 +105,27 @@ where
         }
     }
 
+    /// Acquires a lock on the internal state of the iterator, returning a guard that provides
+    /// optimized access to the iterator's elements.
+    ///
+    /// This method returns a [`SyncUnzipLock`] that maintains the lock for multiple
+    /// operations, which can significantly improve performance when multiple consecutive
+    /// iterations are needed.
+    ///
+    /// # Errors
+    /// Returns a [`LockError`] if another thread holding the lock panicked.
+    ///
+    /// # Example
+    /// ```
+    /// use unzip_iter::Unzip;
+    ///
+    /// let it = vec![(1, "a"), (2, "b")].into_iter();
+    /// let (numbers, _) = it.unzip_iter_sync();
+    ///
+    /// let mut lock = numbers.lock().unwrap();
+    /// assert_eq!(lock.next(), Some(1));
+    /// assert_eq!(lock.next(), Some(2));
+    /// ```
     pub fn lock(&self) -> Result<SyncUnzipLock<'_, A, B, I, O>, LockError> {
         self.inner
             .lock()
@@ -112,6 +133,27 @@ where
             .map_err(|_| LockError)
     }
 
+    /// Attempts to acquire a lock on the internal state of the iterator, returning a guard
+    /// that provides optimized access to the iterator's elements.
+    ///
+    /// Similar to [`lock`](Self::lock), but returns immediately with an error if the lock
+    /// cannot be acquired instead of blocking.
+    ///
+    /// # Returns
+    /// - `Ok(SyncUnzipLock)` if the lock was successfully acquired
+    /// - `Err(TryLockError::WouldBlock)` if the lock is held by another thread
+    /// - `Err(TryLockError::Paniced)` if another thread holding the lock panicked
+    ///
+    /// # Example
+    /// ```
+    /// use unzip_iter::Unzip;
+    ///
+    /// let it = vec![(1, "a"), (2, "b")].into_iter();
+    /// let (numbers, _) = it.unzip_iter_sync();
+    ///
+    /// let lock1 = numbers.try_lock().unwrap();
+    /// assert!(numbers.try_lock().is_err()); // Second lock attempt fails
+    /// ```
     pub fn try_lock(&self) -> Result<SyncUnzipLock<'_, A, B, I, O>, TryLockError> {
         self.inner
             .try_lock()
@@ -122,6 +164,21 @@ where
             })
     }
 
+    /// Returns `true` if the internal state is poisoned.
+    ///
+    /// The internal state becomes poisoned when a thread holding the lock panics.
+    /// This method can be used to check if it's safe to acquire the lock.
+    ///
+    /// # Example
+    /// ```
+    /// use unzip_iter::Unzip;
+    /// use std::thread;
+    ///
+    /// let it = vec![(1, "a"), (2, "b")].into_iter();
+    /// let (numbers, _) = it.unzip_iter_sync();
+    ///
+    /// assert!(!numbers.is_paniced());
+    /// ```
     pub fn is_paniced(&self) -> bool {
         self.inner.is_poisoned()
     }

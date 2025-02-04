@@ -50,10 +50,51 @@ impl<A, B, I, O> UnzipIter<A, B, I, O>
 where
     I: Iterator<Item = (A, B)>,
 {
+    /// Borrows the internal state of the iterator, returning a guard that provides
+    /// optimized access to the iterator's elements.
+    ///
+    /// This method returns a [`UnzipBorrow`] that maintains the borrow for multiple
+    /// operations, which can significantly improve performance when multiple consecutive
+    /// iterations are needed.
+    ///
+    /// # Panics
+    /// This method will panic if the internal state is already borrowed.
+    ///
+    /// # Example
+    /// ```
+    /// use unzip_iter::Unzip;
+    ///
+    /// let it = vec![(1, "a"), (2, "b")].into_iter();
+    /// let (numbers, _) = it.unzip_iter();
+    ///
+    /// let mut borrow = numbers.borrow();
+    /// assert_eq!(borrow.next(), Some(1));
+    /// assert_eq!(borrow.next(), Some(2));
+    /// ```
     pub fn borrow(&self) -> UnzipBorrow<'_, A, B, I, O> {
         UnzipBorrow::new(self.queue_selector, self.inner.borrow_mut())
     }
 
+    /// Attempts to borrow the internal state of the iterator, returning a guard that
+    /// provides optimized access to the iterator's elements.
+    ///
+    /// Similar to [`borrow`](Self::borrow), but returns a [`Result`] instead of panicking
+    /// when the internal state is already borrowed.
+    ///
+    /// # Returns
+    /// - `Ok(UnzipBorrow)` if the borrow was successful
+    /// - `Err(TryBorrowError)` if the internal state is already borrowed
+    ///
+    /// # Example
+    /// ```
+    /// use unzip_iter::Unzip;
+    ///
+    /// let it = vec![(1, "a"), (2, "b")].into_iter();
+    /// let (numbers, _) = it.unzip_iter();
+    ///
+    /// let borrow1 = numbers.try_borrow().unwrap();
+    /// assert!(numbers.try_borrow().is_err()); // Second borrow fails
+    /// ```
     pub fn try_borrow(&self) -> Result<UnzipBorrow<'_, A, B, I, O>, TryBorrowError> {
         self.inner
             .try_borrow_mut()
