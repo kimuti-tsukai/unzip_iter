@@ -29,11 +29,9 @@
 //! assert!(right.eq(vec![3, 6, 9].into_iter()));
 //! ```
 //!
-//! The module also provides [`SyncUnzipIter`] for thread-safe usage via [`Arc`](std::sync::Arc) and [`Mutex`](std::sync::Mutex).
+//! The module also provides [`SyncUnzipIter`](crate::unzip_iters::sync_unzip_iter::SyncUnzipIter) for thread-safe usage via [`Arc`](std::sync::Arc) and [`Mutex`](std::sync::Mutex).
 
 pub mod refpairs;
 pub mod unzip_iters;
 
-pub use refpairs::{IntoRefPairs, RefPairs};
-
-pub use unzip_iters::{SyncUnzipIter, Unzip, UnzipIter};
+pub use unzip_iters::Unzip;
