@@ -11,6 +11,8 @@ use super::{
     unzip_inner::UnzipInner,
 };
 
+pub mod unzip_borrow;
+
 /// An iterator that yields one side of a tuple from the original iterator.
 ///
 /// [`UnzipIter`] is produced by the [`unzip_iter`](crate::Unzip::unzip_iter) method of the [`Unzip`](crate::Unzip) trait. It is responsible for iterating over
