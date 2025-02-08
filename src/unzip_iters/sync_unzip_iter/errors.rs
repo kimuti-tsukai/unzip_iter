@@ -19,20 +19,20 @@ use std::{error::Error, fmt::Display};
 ///
 /// # Variants
 /// - `WouldBlock`: The operation would block because the lock is held by another thread.
-/// - `Paniced`: The inner iterator panicked while holding the lock.
+/// - `Panicekd`: The inner iterator panicked while holding the lock.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TryLockError {
     /// The operation would block.
     WouldBlock,
     /// The inner iterator panicked.
-    Paniced,
+    Panicked,
 }
 
 impl Display for TryLockError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::WouldBlock => write!(f, "try_lock failed because the operation would block"),
-            Self::Paniced => write!(f, "try_lock failed because the inner iterator paniced"),
+            Self::Panicked => write!(f, "try_lock failed because the inner iterator panicked"),
         }
     }
 }
@@ -44,7 +44,7 @@ pub struct LockError;
 
 impl Display for LockError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Failed to Lock. Iterator paniced.")
+        write!(f, "Failed to Lock. Iterator panicked.")
     }
 }
 

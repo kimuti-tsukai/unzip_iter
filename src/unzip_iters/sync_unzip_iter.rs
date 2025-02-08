@@ -113,7 +113,7 @@ where
     /// # Returns
     /// - `Ok(SyncUnzipLock)` if the lock was successfully acquired
     /// - `Err(TryLockError::WouldBlock)` if the lock is held by another thread
-    /// - `Err(TryLockError::Paniced)` if another thread holding the lock panicked
+    /// - `Err(TryLockError::Panicked)` if another thread holding the lock panicked
     ///
     /// # Example
     /// ```
@@ -131,7 +131,7 @@ where
             .map(|locked| SyncUnzipLock::new(self.queue_selector, locked))
             .map_err(|e| match e {
                 std::sync::TryLockError::WouldBlock => TryLockError::WouldBlock,
-                std::sync::TryLockError::Poisoned(_) => TryLockError::Paniced,
+                std::sync::TryLockError::Poisoned(_) => TryLockError::Panicked,
             })
     }
 
@@ -148,9 +148,9 @@ where
     /// let it = vec![(1, "a"), (2, "b")].into_iter();
     /// let (numbers, _) = it.unzip_iter_sync();
     ///
-    /// assert!(!numbers.is_paniced());
+    /// assert!(!numbers.is_panicked());
     /// ```
-    pub fn is_paniced(&self) -> bool {
+    pub fn is_panicked(&self) -> bool {
         self.inner.is_poisoned()
     }
 }
@@ -180,13 +180,13 @@ where
     fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
         self.inner
             .lock()
-            .expect("Failed to Lock. Iterator paniced.")
+            .expect("Failed to Lock. Iterator panicked.")
     }
 
     fn get_inner_mut(&mut self) -> impl std::ops::DerefMut<Target = UnzipInner<A, B, I>> {
         self.inner
             .lock()
-            .expect("Failed to Lock. Iterator paniced.")
+            .expect("Failed to Lock. Iterator panicked.")
     }
 
     fn get_queue_selector(&self) -> Selector<A, B, O> {
@@ -311,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Failed to Lock. Iterator paniced.")]
+    #[should_panic(expected = "Failed to Lock. Iterator panicked.")]
     fn test_panic_iter() {
         let it = (0..).map(|v| {
             assert!(v < 1);
