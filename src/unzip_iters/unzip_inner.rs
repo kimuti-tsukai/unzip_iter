@@ -47,7 +47,7 @@ impl<A> Buffer<A> {
 ///
 /// Test: `how_unzip_inner_works`
 #[derive(Clone, Debug)]
-pub struct UnzipInner<A, B, I: Iterator<Item = (A, B)>> {
+pub struct UnzipInner<A, B, I> {
     iter: I,
     left: Buffer<A>,
     right: Buffer<B>,

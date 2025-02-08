@@ -33,7 +33,7 @@ use crate::unzip_iters::{unzip_inner::UnzipInner, unzip_lock::UnzipLock};
 ///     assert_eq!(lock.next(), Some(3));
 /// } // lock is dropped here
 /// ```
-pub type SyncUnzipLock<'a, A, B, I, O> = UnzipLock<MutexGuard<'a, UnzipInner<A, B, I>>, A, B, I, O>;
+pub type SyncUnzipLock<'a, A, B, I, O> = UnzipLock<MutexGuard<'a, UnzipInner<A, B, I>>, A, B, O>;
 
 #[cfg(test)]
 mod tests {

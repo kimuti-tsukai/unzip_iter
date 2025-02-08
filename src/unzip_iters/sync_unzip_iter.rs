@@ -75,7 +75,7 @@ pub mod errors {
 /// assert_eq!(left_thread.join().unwrap(), vec![1, 2, 3]);
 /// assert_eq!(right_thread.join().unwrap(), vec!["a", "b", "c"]);
 /// ```
-pub struct SyncUnzipIter<A, B, I: Iterator<Item = (A, B)>, O> {
+pub struct SyncUnzipIter<A, B, I, O> {
     queue_selector: Selector<A, B, O>,
     inner: Arc<Mutex<UnzipInner<A, B, I>>>,
 }

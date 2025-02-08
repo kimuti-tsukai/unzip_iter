@@ -33,7 +33,7 @@ use crate::unzip_iters::{unzip_inner::UnzipInner, unzip_lock::UnzipLock};
 ///     assert_eq!(borrow.next(), Some(3));
 /// } // borrow is dropped here
 /// ```
-pub type UnzipBorrow<'a, A, B, I, O> = UnzipLock<RefMut<'a, UnzipInner<A, B, I>>, A, B, I, O>;
+pub type UnzipBorrow<'a, A, B, I, O> = UnzipLock<RefMut<'a, UnzipInner<A, B, I>>, A, B, O>;
 
 #[cfg(test)]
 mod tests {

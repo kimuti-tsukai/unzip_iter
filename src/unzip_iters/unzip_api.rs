@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use super::{selector::Selector, unzip_inner::UnzipInner};
 
-pub trait UnzipInitialize<A, B, I: Iterator<Item = (A, B)>, O> {
+pub trait UnzipInitialize<A, B, I, O> {
     type Unzip;
 
     /// Create a new Unziped iterator from an UnzipInner

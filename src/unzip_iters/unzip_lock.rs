@@ -19,16 +19,12 @@ use crate::unzip_iters::{selector::Selector, unzip_api::UnzipIterAPI, unzip_inne
 /// * `B` - The type of the second element in the tuple
 /// * `I` - The type of the source iterator that yields `(A, B)` tuples
 /// * `O` - The output type of this iterator
-pub struct UnzipLock<T, A, B, I, O>
-where
-    T: DerefMut<Target = UnzipInner<A, B, I>>,
-    I: Iterator<Item = (A, B)>,
-{
+pub struct UnzipLock<T, A, B, O> {
     selector: Selector<A, B, O>,
     borrow: T,
 }
 
-impl<T, A, B, I, O> UnzipLock<T, A, B, I, O>
+impl<T, A, B, I, O> UnzipLock<T, A, B, O>
 where
     T: DerefMut<Target = UnzipInner<A, B, I>>,
     I: Iterator<Item = (A, B)>,
@@ -38,10 +34,10 @@ where
     }
 }
 
-impl<T, A, B, I, O> UnzipIterAPI<A, B, I, O> for UnzipLock<T, A, B, I, O>
+impl<T, A, B, I, O> UnzipIterAPI<A, B, I, O> for UnzipLock<T, A, B, O>
 where
     T: DerefMut<Target = UnzipInner<A, B, I>>,
-    I: Iterator<Item = (A, B)>,
+    for<'a> I: Iterator<Item = (A, B)> + 'a,
 {
     fn get_inner(&self) -> impl std::ops::Deref<Target = UnzipInner<A, B, I>> {
         self.borrow.deref()
@@ -56,10 +52,10 @@ where
     }
 }
 
-impl<T, A, B, I, O> Iterator for UnzipLock<T, A, B, I, O>
+impl<T, A, B, I, O> Iterator for UnzipLock<T, A, B, O>
 where
     T: DerefMut<Target = UnzipInner<A, B, I>>,
-    I: Iterator<Item = (A, B)>,
+    for<'a> I: Iterator<Item = (A, B)> + 'a,
 {
     type Item = O;
 
@@ -72,31 +68,31 @@ where
     }
 }
 
-impl<T, A, B, I, O> DoubleEndedIterator for UnzipLock<T, A, B, I, O>
+impl<T, A, B, I, O> DoubleEndedIterator for UnzipLock<T, A, B, O>
 where
     T: DerefMut<Target = UnzipInner<A, B, I>>,
-    I: DoubleEndedIterator<Item = (A, B)>,
+    for<'a> I: DoubleEndedIterator<Item = (A, B)> + 'a,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         UnzipIterAPI::next_back(self)
     }
 }
 
-impl<T, A, B, I, O> ExactSizeIterator for UnzipLock<T, A, B, I, O>
+impl<T, A, B, I, O> ExactSizeIterator for UnzipLock<T, A, B, O>
 where
     T: DerefMut<Target = UnzipInner<A, B, I>>,
-    I: ExactSizeIterator<Item = (A, B)>,
+    for<'a> I: ExactSizeIterator<Item = (A, B)> + 'a,
 {
 }
 
-impl<T, A, B, I, O> FusedIterator for UnzipLock<T, A, B, I, O>
+impl<T, A, B, I, O> FusedIterator for UnzipLock<T, A, B, O>
 where
     T: DerefMut<Target = UnzipInner<A, B, I>>,
-    I: FusedIterator<Item = (A, B)>,
+    for<'a> I: FusedIterator<Item = (A, B)> + 'a,
 {
 }
 
-impl<T, A, B, I, O> Debug for UnzipLock<T, A, B, I, O>
+impl<T, A, B, I, O> Debug for UnzipLock<T, A, B, O>
 where
     T: DerefMut<Target = UnzipInner<A, B, I>>,
     I: Iterator<Item = (A, B)> + Debug,

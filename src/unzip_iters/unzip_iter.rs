@@ -41,7 +41,7 @@ impl std::error::Error for TryBorrowError {}
 /// assert!(numbers.eq(vec![1, 2, 3].into_iter()));
 /// assert!(letters.eq(vec!["a", "b", "c"].into_iter()));
 /// ```
-pub struct UnzipIter<A, B, I: Iterator<Item = (A, B)>, O> {
+pub struct UnzipIter<A, B, I, O> {
     queue_selector: Selector<A, B, O>,
     inner: Rc<RefCell<UnzipInner<A, B, I>>>,
 }
