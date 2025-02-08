@@ -16,6 +16,21 @@ use super::{
 pub mod unzip_borrow;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Error indicating that a borrow attempt failed because the internal state is already borrowed.
+///
+/// This error is returned by the [`try_borrow`](UnzipIter::try_borrow) method when the internal state
+/// of the iterator is already borrowed, preventing a new borrow from being created.
+///
+/// # Example
+/// ```
+/// use unzip_iter::{Unzip, unzip_iters::unzip_iter::TryBorrowError};
+///
+/// let it = vec![(1, "a"), (2, "b")].into_iter();
+/// let (numbers, _) = it.unzip_iter();
+///
+/// let borrow1 = numbers.try_borrow().unwrap();
+/// assert!(matches!(numbers.try_borrow(), Err(TryBorrowError)));
+/// ```
 pub struct TryBorrowError;
 
 impl std::fmt::Display for TryBorrowError {
