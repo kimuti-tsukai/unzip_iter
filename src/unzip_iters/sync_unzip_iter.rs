@@ -7,7 +7,7 @@ use std::{
 use sync_unzip_lock::SyncUnzipLock;
 
 use super::{
-    selector::Selector,
+    selector::{self, Selector},
     unzip_api::{UnzipInitialize, UnzipIterAPI},
     unzip_inner::UnzipInner,
 };
@@ -163,8 +163,8 @@ where
 
     fn unzip(inner: UnzipInner<A, B, I>) -> Self::Unzip {
         let arc = Arc::new(Mutex::new(inner));
-        let left = SyncUnzipIter::new(Selector::<A, B, O>::LEFT, arc.clone());
-        let right = SyncUnzipIter::new(Selector::<A, B, O>::RIGHT, arc.clone());
+        let left = SyncUnzipIter::new(selector::left(), arc.clone());
+        let right = SyncUnzipIter::new(selector::right(), arc.clone());
         (left, right)
     }
 
@@ -242,7 +242,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::unzip_iters::{selector::Selector, SyncUnzipIter, Unzip, UnzipInner};
+    use crate::unzip_iters::{selector, SyncUnzipIter, Unzip, UnzipInner};
     use std::{
         sync::{Arc, Mutex},
         thread,
@@ -254,12 +254,12 @@ mod tests {
         let inner = Arc::new(Mutex::new(UnzipInner::new(it)));
 
         let left_iter = SyncUnzipIter {
-            queue_selector: Selector::<i32, i32, i32>::LEFT,
+            queue_selector: selector::left(),
             inner: Arc::clone(&inner),
         };
 
         let right_iter = SyncUnzipIter {
-            queue_selector: Selector::<i32, i32, i32>::RIGHT,
+            queue_selector: selector::right(),
             inner,
         };
 

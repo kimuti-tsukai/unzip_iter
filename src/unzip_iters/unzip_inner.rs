@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use super::selector::Selector;
+
 #[derive(Clone, Debug)]
 struct Buffer<A> {
     front: VecDeque<A>,
@@ -73,66 +75,49 @@ impl<A, B, I: Iterator<Item = (A, B)>> UnzipInner<A, B, I> {
     }
 
     /// Get next value
-    pub fn next_either<F, O>(&mut self, f: F) -> Option<O>
-    where
-        for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
-    {
-        let q = self.select_front_queue_mut(&f);
+    pub fn next_either<O>(&mut self, f: Selector<A, B, O>) -> Option<O> {
+        let q = self.select_front_queue_mut(f);
 
         q.pop_front() // Get value from front buffer
             .or_else(|| {
                 // If empty
                 self.next()?; // Push value to front buffer
 
-                let q = self.select_front_queue_mut(&f);
+                let q = self.select_front_queue_mut(f);
                 q.pop_front() // Get value from front buffer
             })
             .or_else(|| {
                 // If Iterator is empty
-                let q = self.select_back_queue_mut(&f);
+                let q = self.select_back_queue_mut(f);
                 q.pop_front() // Get value from back buffer
             })
     }
 
     /// Select front buffer
-    pub fn select_front_queue_mut<F, O>(&mut self, selector: F) -> &mut VecDeque<O>
-    where
-        for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
-    {
-        selector(&mut self.left.front, &mut self.right.front)
+    pub fn select_front_queue_mut<O>(&mut self, selector: Selector<A, B, O>) -> &mut VecDeque<O> {
+        (selector.sel_mut)(&mut self.left.front, &mut self.right.front)
     }
 
     /// Select front buffer
-    pub fn select_front_queue<F, O>(&self, selector: F) -> &VecDeque<O>
-    where
-        for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
-    {
-        selector(&self.left.front, &self.right.front)
+    pub fn select_front_queue<O>(&self, selector: Selector<A, B, O>) -> &VecDeque<O> {
+        (selector.sel_ref)(&self.left.front, &self.right.front)
     }
 
     /// Select back buffer
-    pub fn select_back_queue_mut<F, O>(&mut self, selector: F) -> &mut VecDeque<O>
-    where
-        for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
-    {
-        selector(&mut self.left.back, &mut self.right.back)
+    pub fn select_back_queue_mut<O>(&mut self, selector: Selector<A, B, O>) -> &mut VecDeque<O> {
+        (selector.sel_mut)(&mut self.left.back, &mut self.right.back)
     }
 
     /// Select back buffer
-    pub fn select_back_queue<F, O>(&self, selector: F) -> &VecDeque<O>
-    where
-        for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
-    {
-        selector(&self.left.back, &self.right.back)
+    pub fn select_back_queue<O>(&self, selector: Selector<A, B, O>) -> &VecDeque<O> {
+        (selector.sel_ref)(&self.left.back, &self.right.back)
     }
 
-    pub fn size_hint_either<F, O>(&self, f: F) -> (usize, Option<usize>)
-    where
-        for<'a> F: Fn(&'a VecDeque<A>, &'a VecDeque<B>) -> &'a VecDeque<O>,
+    pub fn size_hint_either<O>(&self, f: Selector<A, B, O>) -> (usize, Option<usize>)
     {
         let (min, max) = self.iter.size_hint();
 
-        let buffer_len = self.select_front_queue(&f).len() + self.select_back_queue(&f).len();
+        let buffer_len = self.select_front_queue(f).len() + self.select_back_queue(f).len();
         let min = min + buffer_len;
         let max = max.map(|max| max + buffer_len);
 
@@ -150,21 +135,19 @@ impl<A, B, I: DoubleEndedIterator<Item = (A, B)>> UnzipInner<A, B, I> {
         Some(())
     }
 
-    pub fn next_back_either<F, O>(&mut self, f: F) -> Option<O>
-    where
-        for<'a> F: Fn(&'a mut VecDeque<A>, &'a mut VecDeque<B>) -> &'a mut VecDeque<O>,
+    pub fn next_back_either<O>(&mut self, f: Selector<A, B, O>) -> Option<O>
     {
-        let q = self.select_back_queue_mut(&f);
+        let q = self.select_back_queue_mut(f);
 
         q.pop_back()
             .or_else(|| {
                 self.next_back();
 
-                let q = self.select_back_queue_mut(&f);
+                let q = self.select_back_queue_mut(f);
                 q.pop_back()
             })
             .or_else(|| {
-                let q = self.select_front_queue_mut(&f);
+                let q = self.select_front_queue_mut(f);
                 q.pop_back()
             })
     }
@@ -179,10 +162,10 @@ mod tests {
     /// Documentation test of [`UnzipInner`]
     #[test]
     fn how_unzip_inner_works() {
-        let it = std::iter::repeat((0, 0));
+        let left = selector::left();
+        let right = selector::right();
 
-        let left = selector::left_mut;
-        let right = selector::right_mut;
+        let it = std::iter::repeat((0, 0));
 
         let mut iter = UnzipInner::new(it);
 
@@ -217,16 +200,19 @@ mod tests {
 
     #[test]
     fn test_unzip_inner_next_either() {
+        let left = selector::left();
+        let right = selector::right();
+
         let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
         let mut inner = UnzipInner::new(it);
 
         // 左側の要素を取得
-        assert_eq!(inner.next_either(selector::left_mut), Some(1));
+        assert_eq!(inner.next_either(left), Some(1));
         // 右側のバッファには要素が残っているはず
         assert_eq!(inner.right.front.pop_front(), Some("a"));
 
         // 右側の要素を取得
-        assert_eq!(inner.next_either(selector::right_mut), Some("b"));
+        assert_eq!(inner.next_either(right), Some("b"));
         // 左側のバッファには要素が残っているはず
         assert_eq!(inner.left.front.pop_front(), Some(2));
     }
@@ -254,6 +240,9 @@ mod tests {
 
     #[test]
     fn test_unzip_inner_buffer_management() {
+        let left = selector::left();
+        let right = selector::right();
+
         let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
         let mut inner = UnzipInner::new(it);
 
@@ -269,43 +258,49 @@ mod tests {
         assert_eq!(inner.right.back.len(), 1);
 
         // バッファから要素を取得
-        assert_eq!(inner.next_either(selector::left_mut), Some(1));
-        assert_eq!(inner.next_either(selector::right_mut), Some("a"));
-        assert_eq!(inner.next_back_either(selector::left_mut), Some(3));
-        assert_eq!(inner.next_back_either(selector::right_mut), Some("c"));
+        assert_eq!(inner.next_either(left), Some(1));
+        assert_eq!(inner.next_either(right), Some("a"));
+        assert_eq!(inner.next_back_either(left), Some(3));
+        assert_eq!(inner.next_back_either(right), Some("c"));
     }
 
     #[test]
     fn test_unzip_inner_empty() {
+        let left = selector::left();
+        let right = selector::right();
+
         let it = Vec::<(i32, &str)>::new().into_iter();
         let mut inner = UnzipInner::new(it);
 
         assert!(inner.next().is_none());
         assert!(inner.next_back().is_none());
-        assert!(inner.next_either(selector::left_mut).is_none());
-        assert!(inner.next_either(selector::right_mut).is_none());
-        assert!(inner.next_back_either(selector::left_mut).is_none());
-        assert!(inner.next_back_either(selector::right_mut).is_none());
+        assert!(inner.next_either(left).is_none());
+        assert!(inner.next_either(right).is_none());
+        assert!(inner.next_back_either(left).is_none());
+        assert!(inner.next_back_either(right).is_none());
     }
 
     #[test]
     fn test_unzip_inner_exact_size() {
+        let left = selector::left();
+        let right = selector::right();
+
         let it = vec![(1, "a"), (2, "b"), (3, "c")].into_iter();
         let mut inner = UnzipInner::new(it);
 
-        assert_eq!(inner.size_hint_either(selector::left), (3, Some(3)));
-        assert_eq!(inner.size_hint_either(selector::right), (3, Some(3)));
+        assert_eq!(inner.size_hint_either(left), (3, Some(3)));
+        assert_eq!(inner.size_hint_either(right), (3, Some(3)));
 
         inner.next();
-        assert_eq!(inner.size_hint_either(selector::left), (3, Some(3)));
+        assert_eq!(inner.size_hint_either(left), (3, Some(3)));
 
-        inner.next_either(selector::left_mut);
-        assert_eq!(inner.size_hint_either(selector::left), (2, Some(2)));
+        inner.next_either(left);
+        assert_eq!(inner.size_hint_either(left), (2, Some(2)));
 
         inner.next_back();
-        assert_eq!(inner.size_hint_either(selector::left), (2, Some(2)));
+        assert_eq!(inner.size_hint_either(left), (2, Some(2)));
 
-        inner.next_back_either(selector::left_mut);
-        assert_eq!(inner.size_hint_either(selector::left), (1, Some(1)));
+        inner.next_back_either(left);
+        assert_eq!(inner.size_hint_either(left), (1, Some(1)));
     }
 }

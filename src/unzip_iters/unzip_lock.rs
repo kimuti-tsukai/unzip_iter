@@ -104,7 +104,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::unzip_iters::{selector::Selector, unzip_inner::UnzipInner, unzip_lock::UnzipLock};
+    use crate::unzip_iters::{
+        selector::{self},
+        unzip_inner::UnzipInner,
+        unzip_lock::UnzipLock,
+    };
 
     /// テスト用の簡単なイテレータを作成するヘルパー関数
     fn create_test_iter() -> std::vec::IntoIter<(i32, String)> {
@@ -120,7 +124,7 @@ mod tests {
     fn test_unzip_lock_first() {
         let iter = create_test_iter();
         let mut inner = UnzipInner::new(iter);
-        let mut lock = UnzipLock::new(Selector::<i32, String, i32>::LEFT, &mut inner);
+        let mut lock = UnzipLock::new(selector::left(), &mut inner);
 
         assert_eq!(lock.next(), Some(1));
         assert_eq!(lock.next(), Some(2));
@@ -132,7 +136,7 @@ mod tests {
     fn test_unzip_lock_second() {
         let iter = create_test_iter();
         let mut inner = UnzipInner::new(iter);
-        let mut lock = UnzipLock::new(Selector::<i32, String, String>::RIGHT, &mut inner);
+        let mut lock = UnzipLock::new(selector::right(), &mut inner);
 
         assert_eq!(lock.next(), Some("one".to_string()));
         assert_eq!(lock.next(), Some("two".to_string()));
@@ -144,7 +148,7 @@ mod tests {
     fn test_unzip_lock_size_hint() {
         let iter = create_test_iter();
         let mut inner = UnzipInner::new(iter);
-        let lock = UnzipLock::new(Selector::<i32, String, i32>::LEFT, &mut inner);
+        let lock = UnzipLock::new(selector::left(), &mut inner);
 
         assert_eq!(lock.size_hint(), (3, Some(3)));
     }
@@ -153,7 +157,7 @@ mod tests {
     fn test_unzip_lock_next_back() {
         let iter = create_test_iter();
         let mut inner = UnzipInner::new(iter);
-        let mut lock = UnzipLock::new(Selector::<i32, String, i32>::LEFT, &mut inner);
+        let mut lock = UnzipLock::new(selector::left(), &mut inner);
 
         assert_eq!(lock.next_back(), Some(3));
         assert_eq!(lock.next_back(), Some(2));
@@ -165,7 +169,7 @@ mod tests {
     fn test_unzip_lock_mixed_iteration() {
         let iter = create_test_iter();
         let mut inner = UnzipInner::new(iter);
-        let mut lock = UnzipLock::new(Selector::<i32, String, i32>::LEFT, &mut inner);
+        let mut lock = UnzipLock::new(selector::left(), &mut inner);
 
         assert_eq!(lock.next(), Some(1));
         assert_eq!(lock.next_back(), Some(3));

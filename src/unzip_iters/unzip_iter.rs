@@ -8,7 +8,7 @@ use std::{
 use unzip_borrow::UnzipBorrow;
 
 use super::{
-    selector::Selector,
+    selector::{self, Selector},
     unzip_api::{UnzipInitialize, UnzipIterAPI},
     unzip_inner::UnzipInner,
 };
@@ -152,8 +152,8 @@ where
 
     fn unzip(inner: UnzipInner<A, B, I>) -> Self::Unzip {
         let rc = Rc::new(RefCell::new(inner));
-        let left = UnzipIter::new(Selector::<A, B, O>::LEFT, rc.clone());
-        let right = UnzipIter::new(Selector::<A, B, O>::RIGHT, rc.clone());
+        let left = UnzipIter::new(selector::left(), rc.clone());
+        let right = UnzipIter::new(selector::right(), rc.clone());
         (left, right)
     }
 

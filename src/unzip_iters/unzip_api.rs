@@ -36,13 +36,13 @@ pub trait UnzipIterAPI<A, B, I: Iterator<Item = (A, B)>, O> {
     /// Get next value
     fn next(&mut self) -> Option<O> {
         let selector = self.get_queue_selector();
-        self.get_inner_mut().next_either(selector.sel_mut)
+        self.get_inner_mut().next_either(selector)
     }
 
     /// Get size hint
     fn size_hint(&self) -> (usize, Option<usize>) {
         let selector = self.get_queue_selector();
-        self.get_inner().size_hint_either(selector.sel_ref)
+        self.get_inner().size_hint_either(selector)
     }
 
     /// Get next back value
@@ -51,6 +51,6 @@ pub trait UnzipIterAPI<A, B, I: Iterator<Item = (A, B)>, O> {
         I: DoubleEndedIterator<Item = (A, B)>,
     {
         let selector = self.get_queue_selector();
-        self.get_inner_mut().next_back_either(selector.sel_mut)
+        self.get_inner_mut().next_back_either(selector)
     }
 }
