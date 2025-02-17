@@ -10,6 +10,17 @@ pub trait UnzipInitialize<A, B, I, O> {
 
     /// Create a new Unziped iterator from a Selector and an UnzipInner
     fn with_selector(selector: Selector<A, B, O>, inner: UnzipInner<A, B, I>) -> Self;
+
+    fn clone(&self) -> Self
+    where
+        I: Iterator<Item = (A, B)>,
+        UnzipInner<A, B, I>: Clone,
+        Self: Sized + UnzipIterAPI<A, B, I, O>,
+    {
+        let inner = self.get_inner().clone();
+        let selector = self.get_queue_selector();
+        Self::with_selector(selector, inner)
+    }
 }
 
 /// API for UnzipIter
@@ -22,16 +33,6 @@ pub trait UnzipIterAPI<A, B, I: Iterator<Item = (A, B)>, O> {
 
     /// Get Selector
     fn get_queue_selector(&self) -> Selector<A, B, O>;
-
-    fn clone(&self) -> Self
-    where
-        Self: Sized + UnzipInitialize<A, B, I, O>,
-        UnzipInner<A, B, I>: Clone,
-    {
-        let inner = self.get_inner().clone();
-        let selector = self.get_queue_selector();
-        Self::with_selector(selector, inner)
-    }
 
     /// Get next value
     fn next(&mut self) -> Option<O> {
