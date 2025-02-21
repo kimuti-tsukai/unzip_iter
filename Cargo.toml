@@ -1,7 +1,7 @@
 [package]
 name = "unzip_iter"
-version = "0.7.0"
-edition = "2021"
+version = "0.8.0"
+edition = "2024"
 repository = "https://github.com/kimuti-tsukai/unzip_iter"
 license = "MIT"
 authors = ["kimuti_tsukai <ruster354@gmail.com>"]
